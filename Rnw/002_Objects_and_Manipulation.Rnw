@@ -1,0 +1,741 @@
+\documentclass{seminar}
+\usepackage[utf8]{inputenc}
+
+\usepackage{RlogoNew}
+\usepackage{Rcolors}
+
+\usepackage{tabularx}
+\usepackage{SeminarExtra}
+\usepackage{op}
+
+\renewcommand{\hlcom}[1]{\textcolor[rgb]{0.625,0.125,0.9375}{\textsl{#1}}}%
+\renewcommand{\code}[1]{\textsl{\texttt{#1}}}
+
+\DeclareGraphicsExtensions{.pdf,.png,.jpg,.JPG}
+\graphicspath{{Fig/}}
+
+<<"prelim",child="00-Prelim.Rnw">>=
+@
+
+<<setFigPath,include=FALSE>>=
+.infile <- sub("\\.Rnw$", "", knitr::current_input())
+knitr::opts_chunk$set(fig.path = paste0('Fig/', .infile, "_")) #$
+session <- sub("^0+", "", sub("[^[:digit:][:alpha:]].*$", "", .infile))
+options(xtable.include.rownames = FALSE)
+@
+
+
+\usepackage{natbib}
+\bibliographystyle{chicago}
+
+\title{\Large \input{title.tex}
+  \Huge \red{Session \Sexpr{session}:\\[10pt]
+    Objects and Their Manipulation}}  %%% Change needed
+
+\input{authorAndDate}
+
+\begin{document}
+\setkeys{Gin}{keepaspectratio=TRUE}
+
+\begin{slide}
+\slidepagestyle{empty}
+
+  {\color{darkgreen}\maketitle}
+\end{slide}
+
+\begin{slide}
+\slidepagestyle{plain}
+\setcounter{slide}{1}
+
+\tableofcontents
+\newslide
+
+\section{Objects and their attributes}
+\label{sec:objects}
+
+\begin{quotation}
+  \footnotesize ``In \S \emph{everything} is an object and
+  \emph{every} object has a \emph{class}.''
+
+  John Chambers, c. 1996.
+\end{quotation}
+
+\begin{quotation}\footnotesize
+  \R is a \emph{language} for \emph{manipulating} \emph{objects}.
+
+  (me)
+\end{quotation}
+\newslide
+
+\subsection{Atomic and recursive objects}
+\label{sec:atomic}
+
+There are five kinds of \emph{\color{red} atomic} object.  In a sense, all other
+objects are made from these.
+
+\begin{description}
+\item[\color{red} \rcode{numeric}] Vectors of numerical quantities.
+\item[\color{red} \rcode{character}] Vectors of \emph{character strings}.
+\item[\color{red} \rcode{logical}] Vectors with components either \rcode{TRUE}
+  or \rcode{FALSE}.
+\item[\color{red} \rcode{complex}] Vectors of complex numbers (each component a
+  pair of numerical quantities).
+\item[\color{red} \rcode{raw}] Vectors of raw bites, mainly used with compiled code.
+\end{description}
+
+
+All have the extra possibility of a \emph{missing value marker} in
+place of a component.  This is shown either as \rcode{NA} or
+\rcode{<NA>}.
+\newslide
+Other types of objects are known as \emph{\color{red} recursive}
+\begin{description}
+  \item[\color{red} \rcode{list}] objects: \rcode{data.frame},
+  fitted model objects, loads of other stuff\dots{}.
+  \item[\color{red} \rcode{date}] objects and their allies:
+  \rcode{POSIXct}, \rcode{POSIXlt}, \rcode{Date}, \dots{}.
+  \item[\color{red} \rcode{language}] objects: \rcode{formula},
+  \rcode{call}, \rcode{expression}, \dots{}.
+  \item[\color{red} \rcode{environment}] objects: the most mysterious of all!
+\end{description}
+
+Even \emph{atomic} objects are more than they seem.
+\begin{itemize}
+\item All objects have two \emph{intrinsic attributes}, namely
+  \rcode{mode} and \rcode{length}.
+\item Objects can have many \emph{assigned} attributes as well, such
+  as \rcode{class}, \rcode{names}, \rcode{names}, \rcode{dimnames},
+  \&c.
+\item Attributes \emph{self-describe} the object.
+\item Object attributes can \emph{allow} some operations and
+  \emph{inhibit} others.
+\end{itemize}
+
+
+\newslide
+\subsection*{Examples}
+\label{sec:exmp}
+
+<<ex1>>=
+set.seed(12345)
+x <- runif(16) %>% round(2)
+dim(x) <- c(4,4)
+dimnames(x) <- list(rows = letters[1:4], columns = LETTERS[1:4]); x[1:2, ]
+attributes(x)
+c(length(x), mode(x), class(x))
+@
+<<ex1a,,out.lines=7>>=
+tx <- as.table(x) %>% as.data.frame(responseName = "values")
+tx              ## turn a numeric matrix into a 'long form' data frame
+class(tx)
+x <- as.vector(x)  ## clear all applied attributes
+attributes(x)
+@
+\newslide
+<<ex1b>>=
+f <- factor(fill0(round(10*x)))  ## see note to follow on fill0(...)
+table(f)
+attributes(f); mode(f)
+f+1       ## arithmetic with factors is inhibited!
+@
+\newslide
+
+Turning a factor back into a numeric vector: two possibilities
+<<line_144_>>=
+as.character(f)
+@
+
+<<ex1c,eval=FALSE>>=
+rbind(A = as.numeric(f),
+      B = as.numeric(as.character(f))) %>%
+  booktabs(digits=0)
+@
+<<line_153_,include=FALSE>>=
+options(xtable.include.rownames = TRUE)
+@
+\begin{center}
+\begin{footnotesize}
+<<line_158_,results="asis",echo=FALSE>>=
+<<ex1c>>
+@
+\end{footnotesize}
+\end{center}
+<<line_163_,include=FALSE>>=
+options(xtable.include.rownames = FALSE)
+@
+
+\newslide
+\subsection*{Filling with zeros}
+\label{sub:Filling with zeros}
+
+\begin{itemize}
+  \item Filling up numerical strings with initial zeros to a constant
+    number of digits can preserve lexicographic ordering in line with numeric.
+  \item The \rfile{WWRCourse} package has two functions that behave
+    identically, but are coded very differently:
+<<line_176_,eval=FALSE>>=
+##
+## Method 1: using string substitution
+fill0 <- function(x) {
+  gsub(" ", "0", format(x, justify = "right"))
+}
+##
+## Method 2: using character size computations and paste
+zfill <- function(x) {
+  m <- max(n <- nchar(x <- as.character(x)))
+  paste0(strrep(0, m-n), x)
+}
+@
+  \item Make sure you know how both work!
+  \end{itemize}
+\newslide
+
+\subsubsection*{Complex types}
+\label{sec:compl}
+
+The forgotten atomic type?
+
+For four given locations in the Gulf of Carpentaria, find the
+shortest marine distances between each of them and show on
+a map.
+
+<<cx1,fig.show="hold">>=
+with(data4, {
+  blueish <- alpha("steelblue", 0.5)
+  z <- complex(real = Longitude, imaginary = Latitude)
+  plot(z, asp = 1, xlim = c(135, 144), ylim = c(-18, -9),
+       bty = "n", xlab = "Latitude", ylab = "Longitude")
+  lines(Oz, col = blueish)
+  text(z, Place, pos = c(2,2,4,4), cex=0.8)
+  ij <- utils::combn(4,2)
+  i <- ij[1, ]
+  j <- ij[2, ]
+  segments(z[i], z[j], lty = "dashed", col = alpha("blue", 0.5))
+  text((z[i]+z[j])/2, round(gcd_km(z[i], z[j])), col="red", cex=0.8)
+})
+@
+
+\newslide
+
+\section{A real pain in the neck}
+\label{sec:pain}
+
+\begin{itemize}
+\item We use some ``typical'' data\footnote{Kindly supplied by Dr~Xiaoqi
+    Chen, UQ} on the outcome of a physiotherapy project to study two
+  ways of ameliorating neck pain, mainly in office workers.
+\item Two groups:
+  \begin{itemize}
+  \item Control: Given advice on neck pain management
+  \item Intervention: Given an exercise programme and advice.
+  \end{itemize}
+\item Five assessment times: 0, 3, 6, 9 and 12 months.  A
+  \emph{longitudinal} study.
+
+\item Several explanatory variables: \texttt{Age}, \texttt{Sex},
+  \texttt{Occupation}, \&c.
+\item Data supplied as a \rfile{stata} binary, available in the
+  \rfile{WWRCourse} package as extra data folder, \code{extdata/stata}.
+\end{itemize}
+\newslide
+
+\subsection{Reading in the data}
+\label{sec:readin}
+
+\begin{itemize}
+\item The modern tool collection, (``\rcode{tidyverse}''), supplies a
+  number of packages for specific data input jobs:
+  \begin{description}
+  \item[\rcode{readr}] For reading mainly text files, especially
+    \texttt{.csv} files.
+  \item[\rcode{readxl}] For reading mainly \Microsoft Excel files.
+  \item[\rcode{haven}] For reading a range of foreign system files,
+    \textit{including \rfile{stata} binaries}.
+  \end{description}
+\item All three produce as the result of their main functions a
+  peculiarly enhanced \rcode{data.frame} known (annoyingly) as a
+  ``\texttt{tibble}''\footnote{No, it's not a cat.}.
+
+  Fortunately it is easy to turn a \texttt{tibble} back into a normal
+  \texttt{data.frame}, and for the most part, we shall.
+\item We will use the ``chaining'' operator, \rcode{\%>\%}, (often incorrectly
+  called a `pipe', but we do it too!) throughout this session without
+  further comment, for clarity.
+\end{itemize}
+\newslide
+
+<<readin, out.lines = 10>>=
+library(haven)
+NPStudy <- read_stata(system.file("extdata", "stata", "NeckPainStudy.dta",
+                                  package = "WWRCourse"))
+sapply(NPStudy, class)
+@
+\texttt{labelled} columns will become \texttt{character};\\
+\texttt{numeric} columns need to be cleared.
+\newslide
+
+\subsection{Key functions}
+\label{sec:fivekey}
+
+The \rcode{dplyr} package supplies five \emph{key} functions, namely
+
+\begin{description}
+\item[\rcode{filter}] For selecting rows
+  (cf. \rcode{subset})
+\item[\rcode{select}] For selecting columns
+  (cf. \rcode{subset(...,select = ...)})
+\item[\rcode{mutate}] (sic!) For computations on columns
+  (cf. \rcode{within()})
+\item[\rcode{arrange}] For ordering rows of a data set
+\item[\rcode{summarise}] Together with \rcode{group\_by}, for
+  summarising data sets in various ways. (cf. \rcode{tapply()}.)
+\item[\rcode{do}] While not a key function, often useful. (cf, \rcode{by()} in old speak)
+\end{description}
+
+\newslide
+<<readin3>>=
+NPStudy <- read_stata(system.file("extdata", "stata", "NeckPainStudy.dta",
+                                 package = "WWRCourse")) %>%
+  lapply(function(x) if(is.labelled(x)) {
+    as_factor(x)
+  } else {
+    as.vector(x)
+  }) %>% untibble()
+Store(NPStudy)  ## for safe keeping
+@
+
+<<readin4>>=
+NeckPain <- NPStudy %>%
+    select(-contains("_cat_")) %>% ## remove categoricals
+  within({
+    Ident <-   paste0("S", fill0(idd))     %>% factor()
+    Cluster <- paste0("C", fill0(cluster)) %>% factor()
+  }) %>%
+  rename(Sex = sex, Group = grp, Organisation = organisation,
+         Industry = industry, Ergo = ergo, Age = age,
+         BMI = bmi, Education = edu, Occupation = occ,
+         Comorbidity = cm) %>%
+  select(Ident, Cluster, Group, Organisation:Occupation,
+                Comorbidity, pain_num_b:pain_num_9m)
+@
+\newslide
+
+\subsection{Missing values - to plug or not to plug?}
+\label{sec:plug}
+
+%% There are many missing values:
+<<plug>>=
+colSums(is.na(NeckPain))
+@
+These are a problem.  In an exploratory analysis it
+seems useful:
+\begin{itemize}
+\item To plug missing values, if there are not too many, in the
+  \emph{explanatory} variables \emph{only}.
+\item To do this, use \emph{only} information in the
+  \emph{explanatory} variables, \textbf{not} the responses.
+\item Don't forget this is \emph{only} for exploratory purposes!
+\end{itemize}
+\newslide
+We will use an imputation process based on random forest technology.
+This is provided in the workshop software.
+
+<<plug2, cache=FALSE>>=
+set.seed(20200211)
+Extract <- NeckPain %>% select(Group:Comorbidity) %>%  ## only these
+  rfImputeUnsupervised() %>%            ## The black box plugger
+  within({                              ## do a bit of cleaning-up
+    Ergo <- round(Ergo)                 ## make things look innocent
+    Age <- round(Age)
+    BMI <- round(BMI, 2)
+  })
+NeckPain[, names(Extract)] <- Extract   ## plug the gaps
+rm(Extract)                             ## destroy the evidence...
+colSums(is.na(NeckPain))                ## check all is OK
+@
+\newslide
+
+\subsection{Wide form to long form}
+\label{sec:longform}
+
+The \rcode{tidyr} package is used for re-shaping data sets, most
+commonly ``wide form'' to or from ``long form''.
+
+Two main functions: \rcode{pivot\_longer} and \rcode{pivot\_wider}.
+
+<<long>>=
+longNeckPain <- NeckPain %>%
+  pivot_longer(pain_num_b:pain_num_9m,
+               names_to = "Time", values_to = "NPain") %>%
+  within({
+    time <- Time                  %>% ## currently a mess
+      sub("b$", "0", .)           %>% ## final 'b' -> 0
+      gsub("[^[:digit:]]", "", .) %>% ## ditch any non-digit
+      as.numeric()                    ## coerce to a number
+    Time <- ordered(paste0("T", fill0(time)))
+    Treat <- ifelse(time == 0, "Base", paste0(substring(Group, 0, 1),
+                                              substring(Time, 2)))
+  }) %>% select(Ident:Group, Time, time, Treat,
+                Organisation:Comorbidity, NPain) %>%
+  arrange(Ident, Time) %>%  na.omit() %>% untibble()
+Store(NeckPain, longNeckPain)
+@ %$
+\newslide
+What have we got? Let's see a few bits:
+<<long2,out.lines=12>>=
+longNeckPain %>%
+  select(Ident, Group:Treat, Ergo:Sex, NPain)
+@
+\newslide
+What is the \rcode{Treat} factor?
+<<line_390_,include=FALSE>>=
+options(xtable.include.rownames = TRUE)
+@
+
+\begin{center}
+<<treat,eval=FALSE>>=
+with(longNeckPain,
+     tapply(Treat, list(Group, Time), unique)) %>%
+  booktabs()                            ## for a neat result!
+@
+<<treat__,results="asis",echo=FALSE>>=
+<<treat>>
+@
+
+\end{center}
+<<line_401_,include=FALSE>>=
+options(xtable.include.rownames = FALSE)
+@
+It reflects the fact that at time~0 no intervention has been applied
+at all: both groups supply a baseline neck pain level to which the
+other ``treatments'' may be compared.
+\newslide
+\subsection{Looking at the data}
+\label{sec:look}
+
+Ignore most explanatory variables and look and numbers and means, first.
+
+\begin{footnotesize}
+  \begin{center}
+<<look,out.lines=9>>=
+meanNPain <- longNeckPain                                  %>%
+  group_by(Group, Time, Treat, Sex)                        %>%
+  summarise(N = n(), Pain = mean(NPain), .groups = "drop") %>%
+  ungroup()                                                %>%
+  untibble()                                               %>%
+  arrange(Treat, Sex)
+meanNPain
+@
+\end{center}
+\end{footnotesize}
+\newslide
+The mean neck pain score is low, (fortunately!), but how does it vary?
+
+<<look2,out.height="0.5\\textheight">>=
+sex_cols <- c(male = "steelblue", female = "rosybrown")
+ggplot(meanNPain)                                    +
+  aes(x = Time, y = Pain, colour = Sex, group = Sex) +
+  geom_point(aes(size = N))                          +
+  geom_line()                                        +
+  facet_wrap(~Group, ncol=2)                         +
+  theme(legend.position = "bottom")                  +
+  ylim(0, 2)                                         +
+  scale_colour_manual(values = sex_cols)
+@
+\newslide
+To put it the other way:
+<<look2a,out.height="0.6\\textheight",fig.height=6,fig.width=9>>=
+ggplot(meanNPain) + aes(x = Time, y = Pain, colour = Sex,
+                        linetype = Group, group = Group) +
+  geom_point(aes(size = N)) + geom_line() + facet_wrap(~Sex, ncol=2) +
+  theme(legend.position = "bottom") + ylim(0, 2) +
+  scale_colour_manual(values = sex_cols)
+@
+
+\newslide
+How many people stuck with the programme?
+\begin{footnotesize}
+\begin{center}
+<<look3,eval=FALSE>>=
+meanNPain                       %>%
+  pivot_wider(id_cols = c(Group, Sex),  ## These columns identify rows
+              names_from = Time, 
+              values_from = N) %>% booktabs
+@
+<<look3__,echo=FALSE,results="asis">>=
+<<look3>>
+@
+
+\end{center}
+\end{footnotesize}
+\newslide
+Some drop-off mid-programme, but some return at the end of the year.
+A picture makes this much easier to notice:
+
+<<look4,out.height="0.7\\textheight">>=
+mNPain <- meanNPain %>% within({
+  Time <- factor(as.character(Time), levels = rev(levels(Time)))
+})
+ggplot(mNPain) + aes(x = Time, y = N,  fill = Sex) +
+  geom_bar(stat = "identity", position = "dodge") + coord_flip() +
+  facet_wrap(~ Group) + theme(legend.position = "bottom") +
+  scale_fill_manual(values = sex_cols)
+@
+\newslide
+
+Rather than mean pain level, the researchers were more interested in
+whether or nor participants exceeded a pain threshold score of 3~or
+more.
+
+\begin{footnotesize}
+  \begin{center}
+<<look5,eval=FALSE>>=
+percentNPain <- longNeckPain                          %>%
+  group_by(Group, Time, Treat, Sex)                   %>%
+  summarise(N = n(), Severe = mean(NPain >= 3) * 100,
+            .groups = "drop")                         %>%
+  ungroup()                                           %>%
+  arrange(Treat, Sex)                                 %>%
+  untibble()
+percentNPain                                          %>%
+  pivot_wider(id_cols = Group:Treat, names_from = Sex, 
+              values_from = Severe)                   %>% booktabs()
+@
+<<look5a,out.height="80%",results="asis",echo=FALSE>>=
+<<look5>>
+@
+
+  \end{center}
+\end{footnotesize}
+
+\newslide
+
+<<look6,out.height="0.6\\textheight",fig.height=6,fig.width=9>>=
+ggplot(percentNPain) + aes(x = Time, y = Severe, colour = Sex, group = Sex) +
+  geom_point(aes(size = N)) + geom_line() + facet_wrap(~Group, ncol=2) +
+  theme(legend.position="bottom") + ylab("% score 3 or higher") +
+  ylim(0, 40) + scale_colour_manual(values = c(male = "steelblue",
+                                               female = "rosybrown"))
+@
+
+\newslide
+Or, to put it another way:
+<<look7,out.height="0.6\\textheight",fig.height=6,fig.width=9>>=
+ggplot(percentNPain) + aes(x = Time, y = Severe, colour = Sex,
+                           linetype = Group, group = Group) +
+  geom_point(aes(size = N)) + geom_line() + facet_wrap(~Sex, ncol=2) +
+  theme(legend.position="bottom") + ylab("% score 3 or higher") +
+  ylim(0, 40) + scale_colour_manual(values = sex_cols)
+@
+\newslide
+
+\section{Another example: 
+  How fast do you speak?}
+\label{sec:dutch}
+
+We use a data set described and provided in the package \rfile{hqmisc}.\footnote{Which is
+not included in the set of packages needed for this course.}  Our version is called \rcode{talkers}.
+
+From the help information on the package:
+
+%% <<engine='bash',echo=FALSE, out.lines=Inf>>=
+%% Rscript -e "{library(hqmisc); help(talkers, help_type='text')}" |\
+%%             sed 's/[^a-zA-Z0-9 [:punct:]]//g' | sed 's/_//g' |\
+%%             sed '2,/^Format/d' | sed '/length in syllables$/q'
+%% @ 
+\begin{knitrout}\footnotesize
+\definecolor{shadecolor}{rgb}{0.957, 0.988, 0.996}\color{fgcolor}\begin{kframe}
+\begin{verbatim}
+talkers                 package:hqmisc                 R Documentation
+
+     A data frame with 80 observations on the following 6 variables.
+     'id' identifier code (from data source, see Source)
+     'sex' sex (0=female, 1=male)
+     'age' age (in years)
+     'region' region of origin (a factor with levels 'M'=Mid,
+          'N'=North, 'S'=South, or 'W'=West)
+     'syldur' average duration of syllables, or seconds per syllable
+          (in seconds, excluding pause time, 1/(articulation rate) )
+     'nsyl' average number of syllables per phrase, or average phrase
+          length in syllables
+\end{verbatim}
+\end{kframe}
+\end{knitrout}
+
+\newslide
+We begin by setting up a more convenient version of the data.
+
+<<dutch1, out.lines = 10>>=
+dutchSpeakers <- talkers %>% within({
+  id <- paste0("S", zfill(id))   ## function in WWRSoftware
+  sex <- recode_factor(sex, `0` = "Female", `1` = "Male")
+  AgeGroup <- factor(ifelse(age > 42, "45+", "40-"),
+                     levels = c("40-", "45+"))
+  region <- factor(as.character(region),
+                   levels = c("N",     "M",      "W",    "S"),
+                   labels = c("North", "Middle", "West", "South"))
+}) %>%
+  rename(Ident = id, Region = region, Sex = sex, ## New = old
+         Drawl = syldur, Verbose = nsyl) %>%
+  arrange(Region, Sex, age)
+@ 
+\newslide
+It is important to check this all went according to plan.
+
+<<dutch4, out.lines=13>>=
+dutchSpeakers  ### look at it
+@ 
+\newslide
+Look at the data graphically.  How \rcode{Drawl} vary with
+\rcode{Sex}, \rcode{Region} and \rcode{AgeGroup}?
+<<dutch4a,out.width='1.0\\linewidth',fig.height=7,fig.width=10>>=
+ggplot(dutchSpeakers) + aes(x = age, y = Drawl, colour = Sex) + 
+  geom_point() +
+  geom_smooth(method = "lm", formula = y ~ (x < 43)) +
+  theme(legend.position = "top") + 
+  geom_vline(xintercept = c(41, 45), linetype = "longdash", 
+             colour = "dark green") + xlab("\nAge of respondent") +
+  facet_wrap( ~ Region) +
+  scale_colour_viridis_d()
+@ 
+
+
+\newslide
+Does the drawl depend on the prolixity?
+<<dutch5, out.width='0.8\\textwidth', fig.height = 4, fig.width = 8>>=
+p0 <- ggplot(dutchSpeakers) + aes(Verbose, Drawl) + 
+  geom_point(colour="brown") + 
+  geom_smooth(method="lm",formula=y~x, size=0.7) 
+p0 + facet_grid(Sex ~ Region)
+@ 
+Generally, drawl falls with prolixity: people using longer phrases
+tend to utter their individual syllables more quickly.
+
+There is a very slow-speaking female from the South region.
+
+Further break-up of the sample by age group will result in groups of
+size~5, which may be rather small to see patterns.  
+
+Or will it?
+
+<<dutch6, out.width='0.8\\textwidth', fig.width = 8, fig.height = 6>>= 
+ggplot(dutchSpeakers) + aes(x = Verbose, y = Drawl) + 
+    geom_point(colour = "brown", size = 1) + 
+    geom_smooth(method = "lm", se = FALSE, fullrange = TRUE, size=0.5,
+                formula = y~x) + 
+    facet_grid(AgeGroup + Sex ~ Region)
+@ 
+Young people talk faster than old?\\
+Males speak more quickly than females?\\
+Regional differences are present, but hard to categorize?
+
+\subsection{A modelling investigation}
+\label{sec:modelling}
+\begin{footnotesize}
+\begin{center}
+<<dutch7, eval=FALSE>>=
+dsModel <- aov(Drawl ~ Verbose+Sex+AgeGroup+Region, dutchSpeakers)
+anova(dsModel) %>% 
+  booktabs(digits = c(0,0,4,4,2,4)) ## for display only.  Cut these bits
+@ 
+<<dutch7__, out.lines = Inf, results = "asis", echo=FALSE>>=
+<<dutch7>>
+@
+
+\end{center}
+\end{footnotesize}
+\newslide
+Because the design is very close to orthogonal, the order in which the
+terms enter the model is not important.
+<<dutch8, out.lines = Inf>>=
+dropterm(dsModel)  ## WWRUtilities enhanced version
+@ 
+\newslide
+Are the coefficients consistent with what we saw in the graphics?
+
+<<dutch7a, out.lines = Inf>>=
+round(summary.lm(dsModel)$coeff, 4) ## check on signs and sizes
+
+#### manual residual analysis
+diagDutchSpeakers <- data.frame(rs = scale(resid(dsModel)),
+                                fv = fitted(dsModel))
+@ 
+\newslide
+\subsection{Diagnostics}
+\label{sec:diagnostics}
+
+For diagnostic checks, traditional graphics are simpler and usually adequate.
+The simplest way is to ``plot'' the fitted model object:
+
+<<dutch8a,eval=FALSE>>=
+layout(rbind(1:2, 3:4))  ## 2 x 2 array of plots, filled by rows
+plot(dsModel)
+@ 
+\newslide
+<<echo=FALSE,out.width = '100%'>>=
+par(bg = "#F4FCFE")
+<<dutch8a>>    
+@ 
+\newslide
+We see what's goint on a bit better if we do it by hand:
+
+<<ducth9,out.width='1.0\\textwidth', fig.width=10, fig.height=5>>=
+layout(rbind(1:2))
+par(bg = "#F4FCFE", family="mono")  ## mundane, old-fashioned look...
+plot(rs ~ fv, diagDutchSpeakers,  col = "steel blue",
+     xlab = "fitted values", ylab = "scaled residuals", 
+     main = "Residuals vs Fitted Values") 
+abline(h = 0, col = "red", lty = "dashed")
+with(diagDutchSpeakers, {
+  qqnorm(rs, xlab = "normal scores", col = "steel blue",
+         ylab = "sorted scaled residuals",
+         main = "Normal Scores Plot")
+  qqline(rs, col = "red", lty = "dashed")
+})
+@ 
+
+The slow speaking person shows up as a clear outlier.  \\
+We should check the extent to which our results are influenced by it.\\
+We could omit it an see if anything changes.\\
+A bette approach is to use a robust method and see what it suggests.
+
+\subsection{The robust alternative}
+\label{sec:robust}
+
+With statistical modelling:
+\begin{itemize}
+\item You usually believe the \red{data}, and the challenge is to
+  construct a {\color{blue} model} which will separate the true
+  signals from the noise as well as possible.
+\item With robust methods, you usually have a good idea of what an
+  appropriate {\color{blue} model} should be, but you have grave
+  doubts about some of the \red{data}.  The challenge is to identify
+  the \emph{\color{hotpink} consistent core of good data} so that
+  your model estimates, and hence your conclusions, are not
+  misleading.
+\item Using both methods in tandem involves a philosophical
+  inconsistency and needs much caution!
+\item There is no fully reliable way to identify outliers from the
+  data itself alone: \emph{\color{hotpink} context is always important}.
+\end{itemize}
+\newslide
+
+
+\newslide
+\phantomsection
+\addcontentsline{toc}{section}{Session information}
+\section*{Session information}
+\label{sec:sessinfo}
+
+\begin{tiny}
+<<sessionInfo,echo=FALSE,results="asis",out.lines=200>>=
+cat("{\\bf\nDate: ", format(today()), "\n}")
+toLatex(sessionInfo(), locale = FALSE)
+@ %def
+\end{tiny}
+
+
+\end{slide}
+
+\end{document}
+

@@ -1,0 +1,553 @@
+\documentclass{seminar}
+\usepackage[utf8]{inputenc}
+
+\usepackage{RlogoNew}
+\usepackage{Rcolors}
+
+\usepackage{tabularx}
+\usepackage{SeminarExtra}
+\usepackage{op}
+
+\renewcommand{\hlcom}[1]{\textcolor[rgb]{0.625,0.125,0.9375}{\textsl{#1}}}%
+\renewcommand{\code}[1]{\textsl{\texttt{#1}}}
+\newcommand{\spreadout}{$\vphantom{\big\{}$\xspace}
+
+\DeclareGraphicsExtensions{.pdf,.png,.jpg,.JPG}
+\graphicspath{{Fig/}}
+
+<<"prelim",child="00-Prelim.Rnw">>=
+@
+
+<<setFigPath,include=FALSE>>=
+.infile <- sub("\\.Rnw$", "", knitr::current_input())
+knitr::opts_chunk$set(fig.path = paste0('Fig/', .infile, "_")) #$
+session <- sub("^0+", "", sub("[^[:digit:][:alpha:]].*$", "", .infile))
+@
+
+
+\usepackage{natbib}
+\bibliographystyle{chicago}
+
+\title{\Large \input{title.tex}
+  \Huge \red{Session \Sexpr{session}:\\[10pt]
+    Vulgar Fractions in \R}}  %%% Change needed
+
+\input{authorAndDate}
+
+\begin{document}
+\setkeys{Gin}{keepaspectratio=TRUE}
+
+\begin{slide}
+\slidepagestyle{empty}
+
+  {\color{darkgreen}\maketitle}
+\end{slide}
+
+\begin{slide}
+\slidepagestyle{plain}
+\setcounter{slide}{1}
+
+\begin{footnotesize}
+\tableofcontents
+
+\end{footnotesize}
+
+\newslide
+\vspace{10pt}
+\includegraphics[width = \textwidth]{Boab1}
+\newslide
+<<line_059_,include=FALSE>>=
+oldOpt <- options(digits = 4)
+theme_set(theme_solarized())
+@
+\section{Why would anyone want to do that?}
+\label{sec:why}
+
+To see patterns more clearly in numbers, particularly in matrices, for
+one example.  What is the pattern here?
+<<hmat,echo=FALSE>>=
+Hmat <- function(k) {
+  M <- matrix(0, k, k)
+  1/(2 * row(M) + col(M) - 1)
+}
+@
+<<hmat2>>=
+Hmat(7)
+@
+\newslide
+
+I'm glad you asked.
+<<hmat3,message=FALSE>>=
+library(fractional)
+Hmat(7) %>% fractional
+detach("package:fractional", unload = TRUE)
+@
+
+So how do we do it?  We need:
+\begin{itemize}
+\item A good algorithm for finding vulgar fractions (well enough),
+\item A coding strategy that does not involve too much work.
+\end{itemize}
+
+\newslide
+
+\section{An algorithm}
+\label{sec:algorithm}
+
+The idea is old, and well described in old books such as
+\citet{khovanskii_1963}.  See the vignettes in \citet{venables_16:fractional}.
+
+
+A continued fraction is a development of the form:
+
+\begin{displaymath}
+b_0 + \cfrac{a_1}{b_1 + \cfrac{a_2}{b_2 + \cfrac{a_3}{b_3 +
+      \dotsb \vphantom{\cfrac{a_4}{b_4}}}}}
+\end{displaymath}
+
+Stopping gives the \emph{convergents}:
+
+\begin{displaymath}
+\frac{P_n}{Q_n} = b_0 + \cfrac{a_1}{b_1 + \cfrac{a_2}{b_2 +
+    \cfrac{a_3}{\begin{matrix}
+        b_3 + \cdots\vphantom{\cfrac{1}{}} & \\
+        & b_{n-1} + \cfrac{a_n}{b_n}
+      \end{matrix}
+}}}
+\end{displaymath}
+
+
+Calculate by recurrence.  With
+\begin{displaymath}
+\frac{P_{-1}}{Q_{-1}} = \frac{1}{0},
+\frac{P_0}{Q_0} = \frac{b_0}{1},
+\frac{P_1}{Q_1}, \frac{P_2}{Q_2}, \cdots
+\end{displaymath}
+It can be shown that
+\begin{displaymath}
+  \left.
+    \begin{matrix}
+      P_{n+1} & = & b_{n+1}P_n + a_{n+1}P_{n-1} \\
+      Q_{n+1} & = & b_{n+1}Q_n + a_{n+1}Q_{n-1}
+    \end{matrix}
+  \right\} \quad n = 0, 1, 2, \ldots
+\end{displaymath}
+
+\newslide
+Getting the $a_n$ and $b_n$.
+\begin{enumerate}
+\item Let $x$ be a real number for which the approximation is
+  wanted.
+\item Write $b_0 = \lfloor x\rfloor$ and put $x = b_0 + (x - \lfloor
+  x\rfloor) = b_0 + r_0$.
+\item $0 \leq r_0 < 1$, by definition.  There are two cases:
+
+  \begin{itemize}
+  \item If $r_0 = 0$ the process is complete.  The rational
+    approximation is exact.
+  \item If $r_0 > 0$, note that $1/r_0 > 1$. Write $1/r_0 = \lfloor
+    1/r_0 \rfloor + (1/r_0 - \lfloor 1/r_0 \rfloor) = b_1+r_1$, with
+    $b_1 \geq 1$ and $0 \leq r_1 < 1$. Then:
+    $$ x = b_0 + \frac{1}{1/r_0} = b_0 + \cfrac{1}{b_1 + r_1}$$
+  \end{itemize}
+\item Continuing in this way we produce a continued fraction
+    expansion for the real number of the form:
+    $$
+    x = b_0 + \cfrac{1}{b_1 + \cfrac{1}{b_2 + \cfrac{1}{b_3 + \dotsb
+          \vphantom{\cfrac{1}{b_4}}}}}
+    $$
+  \end{enumerate}
+
+\textbf{In English}:  The $a_i$ are all $1$.  Easy.  Let $x$ be the number.
+\begin{itemize}
+\item $b_0$ is the largest whole number less than $x$.  If there is
+  any remainder, $r_0$:
+\item $b_1$ is the largest whole number less than $1/r_0$. If there is
+  any remainder, $r_1$:
+\item $b_2$ is the largest whole number less than $1/r_1$. If there is
+  any remainder, $r_2$: (you get the picture). Stop when good enough.
+\end{itemize}
+\newslide
+
+\section{An \R coding}
+\label{sec:coding}
+
+<<rat1>>=
+#' @describeIn ratAppr Workhorse function for a single value
+#' @export
+.ratAppr <- function(x, eps = 1.0e-6, maxConv = 20) {
+  PQ1 <- c(1, 0)
+  PQ2 <- c(floor(x), 1)
+  r <- x - PQ2[1]
+  i <- 0
+  while((i <- i+1) < maxConv && abs(x - PQ2[1]/PQ2[2]) > eps) {
+    b <- floor(1/r)
+    r <- 1/r - b
+    PQ0 <- PQ1
+    PQ1 <- PQ2
+    PQ2 <- b*PQ1 + PQ0
+  }
+  return(c(PQ2, i-1))
+}
+@
+\newslide
+\subsection{Vectorization}
+\label{sec:vect}
+
+
+
+<<rat2>>=
+ratAppr <- function(x, eps = 1.0e-6, maxConv = 20) {
+  vapply(x, FUN = .ratAppr,
+         FUN.VALUE = c(Pn = 0, Qn = 0, n = 0),
+         eps = eps, maxConv = maxConv)
+}
+@
+Always check as you go:
+<<rat3>>=
+.ratAppr(base::pi)
+ratAppr(c(1:10/7, pi, sqrt(2)))
+@
+
+Looks OK.
+\newslide
+
+\subsection{The main function}
+\label{sec:main}
+
+
+<<rat4>>=
+vulgar <- function(x, eps = 1.0e-6, maxConv = 20) {
+  structure(x, eps = eps, maxConv = maxConv,
+            class = c("vulgar", class(x)))
+}
+@
+
+I.e. do \emph{NOTHING}, but take note of what has been requested and
+pack it into the object.
+
+The yang to this ying is just as simple:
+
+<<rat5>>=
+unvulgar <- function(x) {
+  x <- unclass(x)
+  attr(x, "eps") <- attr(x, "maxConv") <- NULL
+  x
+}
+@
+\newslide
+
+\subsection{Arithmetic}
+\label{sec:arith}
+
+In \rcode{S3} land, this is done by giving a method for a
+\emph{group generic function}, \rcode{Ops}.  First a couple of helpers:
+<<rat6>>=
+getAttr <- function(x)
+  UseMethod("getAttr")
+getAttr.default <- function(x)      ## not "vulgar" make it up
+  list(eps = 1.0e-6, maxConv = 20)
+getAttr.vulgar <- function(x)       ## is "vulgar", get it
+  attributes(x)[c("eps", "maxConv")]
+@
+\newslide
+Now the group generic method.  ``Just do what you always do'':
+<<rat7>>=
+Ops.vulgar <- function (e1, e2) {
+  ax <- getAttr(e1)
+  e1 <- unclass(e1)
+  if (!missing(e2)) {  ## not unary minus or plus
+    ax2 <- getAttr(e2)
+    ax <- list(eps = min(ax$eps, ax2$eps),
+               maxConv = max(ax$maxConv, ax2$maxConv))
+    e2 <- unclass(e2)
+  }
+  res <- NextMethod(.Generic)
+  if(typeof(res) == "logical") { ## it was a logical operator
+    res
+  } else {
+    with(ax, vulgar(res, eps = eps, maxConv = maxConv))
+  }
+}
+@
+\newslide
+Check as you go:
+<<rat8>>=
+<<hmat>>
+vulgar(Hmat(3)) + 1
+@
+OK, but some work still to do.
+\newslide
+
+\subsection{Coercion to character}
+\label{sec:character}
+
+We do this indirectly. \rcode{base::as.character} is a
+\rcode{.Primitive} generic function.
+
+<<aschar>>=
+as.character.vulgar <- function (x, eps = attr(x, "eps"),
+                                 maxConv = attr(x, "maxConv"), ...) {
+  x <- unclass(x)
+  ax <- attributes(x)
+  rx <- ratAppr(as.vector(x), eps = eps, maxConv = maxConv)
+  fractions <- sub("/1$", "", paste(rx["Pn", ], rx["Qn", ], sep = "/"))
+  ax$maxConv <- ax$eps <- NULL
+  attributes(fractions) <- ax
+  class(fractions) <- "vulgarCharacter"
+  fractions
+}
+@ %$
+
+The main work comes when we actually \emph{look} at a \rcode{vulgar} object.
+
+The function \rcode{base::print} is an \rcode{S3} generic, so more methods!
+
+\newslide
+
+\subsection{Printing}
+\label{sec:printing}
+
+Zeros as \emph{displayed} as dots, \rcode{.}, to reduce clutter.
+
+<<print1>>=
+print.vulgarCharacter <- function(x, ...) {
+  y <- x
+  x <- gsub("^0$", ".", unclass(x))
+  NextMethod("print", quote = FALSE, ...)
+  invisible(y)
+}
+print.vulgar <- function (x, ...) {
+  x0 <- x
+  y <- gsub("^0$", ".", as.character.vulgar(x))
+  y <- format(y, justify = "right")
+  ax <- attributes(x)
+  ax$class <- ax$eps <- ax$maxConv <- NULL
+  x <- do.call("structure", c(list(y), ax))
+  NextMethod("print", quote = FALSE, ...)
+  invisible(x0)
+}
+@
+%% \newslide
+Fingers crossed, let's check it:
+
+<<check>>=
+(vulgar(Hmat(3)) + 1) %>% as.character
+cbind(diag(1/1:3), 0) - vulgar(cbind(0, diag(1/3:1)))
+contr.helmert(4) %>% cbind(Ave = 1, .) %>% solve %>% vulgar
+@
+
+\newslide
+
+\section{Moving to compiled code}
+\label{sec:cpp}
+Stepping it up a notch: going to \Cpp.
+<<cpp,engine="Rcpp">>=
+#include <Rcpp.h>
+using namespace Rcpp;
+
+IntegerVector ratApp_one(double x, double eps, int maxConv) {
+  int p0, p1 = 1, p2 = (int) floor(x),
+      q0, q1 = 0, q2 = 1, b, i = 0;
+  double z = x - (double) p2;
+  while(++i < maxConv) {
+    if(fabs(x - (double) p2 / (double) q2) < eps) break;
+    z = 1/z; b = (int) floor(z); z = z - b;
+    p0 = p1; p1 = p2; p2 = b*p1 + p0;
+    q0 = q1; q1 = q2; q2 = b*q1 + q0;
+  }
+  return IntegerVector::create(p2, q2, i-1);
+}
+
+//' @describeIn ratAppr C++ version of the same function
+//' @export
+//' @import Rcpp
+//' @useDynLib vulgar
+// [[Rcpp::export]]
+IntegerMatrix ratApp(NumericVector x, double eps = 1.0e-6, int maxConv = 20) {
+  int nx = x.length();
+  IntegerMatrix PQC(3, nx);
+  PQC.attr("dimnames") =
+    List::create(CharacterVector::create("Pn", "Qn", "n"),
+                 R_NilValue);
+  for(int i = 0; i < nx; i++) {
+    PQC(_, i) = ratApp_one(x[i], eps, maxConv);
+  }
+  return PQC;
+}
+@
+\newslide
+
+Check that it works, too.  Using \rcode{Rcpp::sourceCpp} creates a
+function of the same name with an odd appearance
+<<check_ratApp>>=
+ratApp
+@
+
+It should give the same results as the function \rcode{ratAppr}
+written in pure \R, but faster.
+<<chech_2>>=
+u <- runif(11); rbind(R = ratAppr(u), Cpp = ratApp(u))
+all.equal(ratAppr(u), ratApp(u))
+@
+\newslide
+
+\subsection{Timings}
+\label{sec:timings}
+
+
+To get a feeling for speed, consider random inputs
+<<chech_3,out.height="2in",fig.height=4,fig.width=6,cache=TRUE>>=
+die <- Sys.time() %>% as.POSIXlt %>% unclass %>%
+  (function(x) x$min*x$sec) %>% round
+set.seed(die)  ## The die is cast!
+
+library(microbenchmark)
+u <- runif(10000)
+(bm <- microbenchmark(ratAppr(u), ratApp(u)))
+suppressMessages(autoplot(bm)) + ggthemes::theme_economist()
+@
+
+\framebox[1.0\linewidth]{
+  \begin{minipage}[h]{0.95\linewidth}
+    \emph{\textbf{Reality check:}} The possibility of anyone wanting
+    to look at 10000 numbers in the form of vulgar fractions, even to
+    check for patterns, is low, and if they did, they are probably
+    willing to wait 130 milli\-seconds or so for them to be
+    calculated.  Until further applications arise, this is just a
+    \emph{programming} exercise.
+  \end{minipage}
+}
+
+\newslide
+Make the change, and \emph{check it still works}:
+<<aschar1>>=
+as.character.vulgar <- function (x, eps = attr(x, "eps"),
+                                 maxConv = attr(x, "maxConv"), ...) {
+  x <- unclass(x)
+  ax <- attributes(x)
+  ## the only chenged line is the one below
+  rx <- ratApp(as.vector(x), eps = eps, maxConv = maxConv)
+  fractions <- sub("/1$", "", paste(rx["Pn", ], rx["Qn", ], sep = "/"))
+  ax$maxConv <- ax$eps <- NULL
+  attributes(fractions) <- ax
+  class(fractions) <- "vulgarCharacter"
+  fractions
+}
+cbind(Ave = 1, contr.helmert(4)) %>% solve %>% vulgar
+@ %$
+\newslide
+
+\section{Creating a package}
+\label{sec:package}
+
+The procedure for creating a package from these materials inside
+\RStudio is relatively simple.
+\begin{itemize}
+\item Save the \R functions \emph{in text form} in a file, or files
+  with the file extension \rfile{.R}.
+\item If you want to use the \Cpp version, save the text version in a
+  file with file extension \rfile{.cpp}. (The upside is that it is
+  fast; the downside is that you must have the tools to build it, of
+  course, and the source package is only portable to others with those
+  tools as well.)
+\item Open the \rfile{New Project} menu in \RStudio.
+  \begin{itemize}
+  \item Specify that you want a \rfile{Package} project, preferably in
+    a \emph{new} rather than an existing directory.
+  \item Add the file names of the files you have just created with the
+    software, both \R and \Cpp, to the box in the menu (but more files
+    can be added later, if need be).
+  \end{itemize}
+\item Click the \rfile{Create Project} box. This will re-start the \R
+  session with your newly created project as the working directory.
+  Your main directory will have several files including templates of
+  the \rfile{DESCRIPTION} and \rfile{NAMESPACE} files, and
+  sub-directories \rfile{R}, \rfile{man}, possibly \rfile{inst} and
+  \rfile{vignettes} if you include \rfile{.Rmd} files, and
+  \rfile{src} if you are using \Cpp.  There are the \RStudio project
+  files as well, which are excluded when the package is built.
+  \emph{Explore} the file structure that has been created.
+\item At this stage you should be able to click on the \rfile{Build}
+  tab and build a very rough first draft of the package.  Test it.
+\item Fill out the \rfile{DESCRIOTION} file in the top directory.
+  \emph{Do not change} the \rfile{NAMESPACE} file, though.
+
+
+\item Fill out the \rcode{roxygen2} comments above all functions you
+  want to have exported, at least.  \textbf{This is the only fairly
+    big job, and does need to be done carefully.}  You will need to
+  refer frequently to the online documentation, which fortunately is
+  fairly comprehensive and clear.\footnote{
+  The clear advantage of using inline documentation is that the
+  computer does all of the really tedious editing and correcting, and
+  ensuring consistency, rather than you.  It is well worth the trouble
+  of learning how to use it. But it is something that has to be
+  learned.}
+
+\item With the documentation comments completed, Go to the
+  \rfile{Build} tab and select \rfile{More} and on to \rfile{Configure
+    build tools}
+
+  Check the box that asks if you want your \rfile{NAMESPACE} file to
+  be constructed from your documentation comments---you do---and any
+  other boxes you thing might be relevant.
+\item Think about adding a small \rfile{.Rmd} vignette to the
+  package.  To do, create a \rfile{vignettes} (plural) sub-directory,
+  and place your markdown file(s) into it.  Then check the box that
+  asks if you want the vignettes re-built.  Also add a line
+
+  \texttt{VignetteBuilder: knitr}
+
+  to the \rfile{DESCRIPTION} file.
+\item To initialize a vignette, it often pays to build a first cut using
+<<line_504_,eval=FALSE>>=
+devtools::build_vignettes()
+@
+but once the process it started, it should automatically update as
+things change.
+
+\emph{If you do simply open an \rfile{.Rmd} file while in a package
+  project, much of the detail should be handled automatically, but
+  check it!}
+
+\item Re-build the package and hope for the best!  It sometimes pays
+  to use
+<<line_516_,eval=FALSE>>=
+devtools::document()
+@
+beforehand, and check if the help information (in the \rfile{man}
+sub-directory) looks OK, as well as some modifications elsewhere,
+e.g. to \rfile{DESCRIPTION} again.
+\item Using the \rfile{Build} tools, check the package.  You may want
+  to configure the build tools to add ``\rfile{--as-cran}'' to the
+  checking options, if you wish ultimately to publish it on
+  \rfile{CRAN} (but there is already at least one \rfile{vulgar}
+  package on CRAN, namely \rfile{fractional}).
+\item Build a source package if you want to pass it on to colleagues.
+\end{itemize}
+
+
+\newslide
+% \clearpage
+\phantomsection
+\addcontentsline{toc}{section}{References}
+\bibliography{refs}
+
+\newslide
+\phantomsection
+\addcontentsline{toc}{section}{Session information}
+\section*{Session information}
+\label{sec:sessinfo}
+\vspace{-10pt}
+
+<<sessionInfo,echo=FALSE,results="asis",out.lines=200>>=
+cat("{\\bf\nDate: ", format(today()), "\n}")
+toLatex(sessionInfo())
+@ %def
+
+
+
+\end{slide}
+
+\end{document}

@@ -1,0 +1,734 @@
+\documentclass{seminar}
+\usepackage[utf8]{inputenc}
+
+\usepackage{RlogoNew}
+\usepackage{Rcolors}
+
+\usepackage{tabularx}
+\usepackage{SeminarExtra}
+\usepackage{op}
+
+\renewcommand{\hlcom}[1]{\textcolor[rgb]{0.625,0.125,0.9375}{\textsl{#1}}}%
+\renewcommand{\code}[1]{\textsl{\texttt{#1}}}
+\newcommand{\spreadout}{$\vphantom{\big\{}$\xspace}
+
+\DeclareGraphicsExtensions{.pdf,.png,.jpg,.JPG}
+\graphicspath{{Fig/}}
+
+<<"prelim",child="00-Prelim.Rnw">>=
+@
+
+<<setFigPath,include=FALSE>>=
+.infile <- sub("\\.Rnw$", "", knitr::current_input())
+knitr::opts_chunk$set(fig.path = paste0('Fig/', .infile, "_")) #$
+session <- sub("^0+", "", sub("[^[:digit:][:alpha:]].*$", "", .infile))
+@
+
+
+\usepackage{natbib}
+\bibliographystyle{chicago}
+
+\title{\Large \input{title.tex}
+  \Huge \red{Session \Sexpr{session}:\\[5pt]
+    \spreadout{}An Introduction to\\
+    \spreadout{}Parallel Programming}}  %%% Change needed
+
+\input{authorAndDate}
+
+\begin{document}
+\setkeys{Gin}{keepaspectratio=TRUE}
+
+\begin{slide}
+\slidepagestyle{empty}
+
+  {\color{darkgreen}\maketitle}
+\end{slide}
+
+\begin{slide}
+\slidepagestyle{plain}
+\setcounter{slide}{1}
+
+\tableofcontents
+
+\newslide
+\vspace{10pt}
+\includegraphics[width = \textwidth]{White-bellied_Sea_Eagle_May_2006}
+\newslide
+<<line_057_,include=FALSE>>=
+library(ggthemes)
+oldOpt <- options(digits = 4)
+theme_set(theme_bw())
+knitr::opts_chunk$set(warning = TRUE)
+@
+\section{Why would anyone want to do that?}
+\label{sec:why}
+
+Under normal circumstances (for statisticians!) you probably don't.
+
+\begin{itemize}
+\item Modern computers have large memory (relative to the  past) and
+  mostly they also have multiple ``cores''\footnote{Desktops and
+    laptops will usually have 4, 8 or 16.  ``Graphical Processing
+    Units'' (GPU's) will typically have thousands.}.  This allows them to do
+  (in effect) several things at once.  Sometimes you want to call upon
+  several of them rather than just the one (usually) your process has
+  been allocated.
+\item They can also have fast internet connections to other machines
+  that be called upon to share a computational load, for a very large
+  computation.
+\end{itemize}
+
+Parallel processing allows you to harness these additional resources
+to tackle typically very large jobs, perhaps needing days to finish.
+A fairly recent book, \citep{matloff:2015}, offers some useful techniques and insights.
+\newslide
+
+\subsection{\emph{Embarrassingly} parallel problems}
+\label{sec:embarrassing}
+
+These problems are of a kind where
+\begin{itemize}
+\item the computation job can be subdivided into several sub-jobs,
+  \emph{all of the same kind},
+\item which can be run independently of each other (i.e. \emph{no
+    inter-process communication}) and
+\item at the end, the results can be collected up \emph{in any order}.
+\end{itemize}
+
+Restrictive as it appears, a surprising number of real problem fit the
+paradigm.  For example, in Statistics, most simulation and
+bootstrapping problems qualify.
+
+In more complex ``process'' models, the computational sub-jobs are
+typically much more varied and interconnected and more subtle and
+delicate programming is required.
+
+We will only consider \emph{embarrassingly parallel} problems here.
+\newslide
+\section{The core package: {\tt parallel}}
+\label{sec:The core package:parallel}
+
+This package provides various low-level tools, as well as a suite
+of simple high-level tools for \emph{embarrassingly parallel} applications
+which mirror the standard interlooping tools, such as \rcode{lapply}, 
+\rcode{sapply}, \&c, plus a few. A good quick way to get a start is
+to look at the help information for a key function, such as:
+<<echo=FALSE>>=
+library(parallel)
+@
+
+<<results="hide", eval=FALSE>>=
+library(parallel)
+?clusterApply
+@
+
+Working through a simple example makes the process clearer.
+
+Recalling the \rcode{BirthWt} logistic regression, lets do a brute-force
+check that the optimal regressions we found using the stepwise procedure
+are, in fact, best in a very large field of possible models.
+
+As this is a logistic regression problem, the models have to be fitted
+``from scratch'', one after another.
+\newslide
+First, consider a non-parallel approach.  We need to do a bit of
+preparatory work beforehand to establish the field of candidate models.
+<<>>=
+nam <- c(setdiff(names(BirthWt), "low"), 
+         "poly(age,2)", "smoke*ui", "age*ftv", "poly(lwt,2)")
+g <- (2 + log(nrow(BirthWt)))/2  ## "Goldilocks" penalty
+
+all_forms <- "low~1"
+for(n in nam) {
+  all_forms <- c(all_forms, paste(all_forms, n, sep = "+"))
+}
+all_forms <- sub("1\\+", "", all_forms)
+all_forms[1:8]
+length(all_forms)
+@
+We will fit all logistic regressions with the main effect terms,
+together with a few well-chosen curvilinear and interaction terms.
+\newslide
+The sequential computation (single core)
+<<>>=
+t1 <- system.time({
+  res <- vapply(all_forms, function(form) {
+    thisCall <- substitute(glm(FORM, binomial, BirthWt),
+                           list(FORM = as.formula(form)))
+    thisModel <- eval(thisCall)
+    thisLogL <- logLik(thisModel)
+    c(AIC = AIC(thisModel),
+      BIC = BIC(thisModel),
+      GIC = AIC(thisModel, k = g),
+      logL = as.vector(thisLogL),
+      DF = as.integer(attr(thisLogL, "df")))
+  }, FUN.VALUE = c(AIC = 0.0, BIC = 0.0, GIC = 0.0,
+                   logL = 0.0, DF = 0L))
+})
+t1  ## how long did that take?
+@
+Note especially how the output is kept as small as possible,
+retaining all essential information.
+\newslide
+Now the parallel version (on various machines; this is a  
+\Sexpr{.Platform$OS.type} machine with \Sexpr{detectCores()} cores):
+<<>>=
+cl <- makePSOCKcluster(max(1, detectCores()-1))     ## set up cores-1 machines
+clusterEvalQ(cl, library(WWRData)) %>% invisible()
+clusterExport(cl, "g")                              ## the all have "g" 
+
+t2 <- system.time({                                 ## farm out the jobs
+  resP <- parSapply(cl, all_forms, function(form) {
+    thisCall <- substitute(glm(FORM, binomial, BirthWt),
+                           list(FORM = as.formula(form)))
+    thisModel <- eval(thisCall)
+    thisLogL <- logLik(thisModel)
+    c(AIC = AIC(thisModel),
+      BIC = BIC(thisModel),
+      GIC = AIC(thisModel, k = g),
+      logL = as.vector(thisLogL),
+      DF = as.integer(attr(thisLogL, "df")))
+  })
+})
+stopCluster(cl)
+rm(cl)
+@
+\newslide
+Now for some checks.  Did it work?  How much faster was it?
+<<>>=
+all.equal(res, resP)
+
+rbind(t1, t2)[, c("user.self", "sys.self", "elapsed")]
+@
+
+Now we need to see which were the ``best'' models.
+
+\newslide
+<<>>=
+results <- data.frame(formula = all_forms, t(res), 
+                      stringsAsFactors = FALSE) %>% 
+  arrange(logL, DF) %>% 
+  filter(!(c(1, diff(logL)) < 1e-6 & c(1, diff(DF)) == 0))
+
+best10_AIC <- results %>% arrange(AIC) %>% filter(AIC < AIC[11])
+best10_BIC <- results %>% arrange(BIC) %>% filter(BIC < BIC[11])
+best10_GIC <- results %>% arrange(GIC) %>% filter(GIC < GIC[11])
+
+list(AIC = as.formula(best10_AIC$formula[1]),
+     BIC = as.formula(best10_BIC$formula[1]),
+     GIC = as.formula(best10_GIC$formula[1]))
+@
+\newslide
+Now compare with what \rcode{step\_AIC} would have produced, starting
+from our largest model:
+<<>>=
+BW0 <- glm(low ~ ., binomial, BirthWt)
+scope <- list(lower = ~1, upper = ~.^2+poly(age, 2)+poly(lwt,2))
+list(AIC = step_AIC(BW0, scope = scope),
+     BIC = step_BIC(BW0, scope = scope),
+     GIC = step_AIC(BW0, scope = scope, k = g)) %>% 
+       lapply(formula)
+@
+Close, but not the same!
+
+
+
+\newslide
+
+\section{The {\tt doParallel} package approach}
+\label{sec:The doParallel package approach}
+
+The \rcode{doParallel} package offers another approach to acccessing the parallel
+processing technology, which has gained wide acceptance in some areas of application,
+as it offers a bit more flexibility than the core \rcode{parallel} package on which
+it is built.\footnote{Note that this is only one of many alternative parallel
+processing \R packages we could have used, though.}
+\subsection{Iterators}
+\label{sec:iterators}
+(See the vignettes in the \rfile{iterators} and \rfile{foreach}
+package for more.)
+\begin{itemize}
+\item A special type of \R object that once set up, ``feeds out'' part
+  of an object in sequence.  They may be finite, or unending.
+\item Mainly used in conjunction with the \rcode{foreach} function (of
+  the eponymous package.)
+\end{itemize}
+\newslide
+Examples:
+<<it1,out.lines=6>>=
+suppressPackageStartupMessages({
+  library(doParallel)
+})
+search()
+@
+\newslide
+A slim example:
+<<line_124_>>=
+X <- matrix(1:20, 5, 4) %>% print
+itXrows <- iter(X, by = "row")
+Xt <- foreach(x = itXrows, .combine = cbind) %do% rev(x) ## NOT parallel yet!
+Xt
+@
+
+\newslide
+\subsection{A simulation envelope for a normal scores plot}
+\label{sec:env}
+
+The Boston House Price data.
+<<it2,fig.height=5,fig.width=7.5,out.height="0.5\\textheight">>=
+hp_model <- lm(log(medv) ~ ., Boston)
+rdat  <- data.frame(res = resid(hp_model))
+ggplot(rdat) + aes(sample = res) + geom_qq() + 
+  labs(y = "residuals", x = "normal scores",
+       title = "Boston House Price Data")
+@
+\newslide
+The strategy is
+\begin{itemize}
+\item Simulate a large number of observation vectors using only the
+  fitted model itself (ie. not the observations directly)
+\item Re-fit the model again for each simulation to get simulated
+  residuals
+\item Finally check where the actual residuals sits relative to the
+  ideal simulated residual distributions.
+\end{itemize}
+To speed things up (hopefully!) we will do the simulations in
+parallel, spreading the work across several cores.  We use the
+\rfile{doParallel} package, \citep{revolution:_2015}, which also adds
+\rfile{foreach}, \rfile{iterators} and \rfile{parallel} itself to the
+search path.
+\newslide
+A fundamental tool:
+<<line_159_>>=
+simulate              ## An S3 generic function in package:stats
+methods("simulate")   ## for what kinds of model does it cater?
+########################  initialisation
+library(doParallel)
+cores <- detectCores() %>% print
+cl <- makeCluster(cores - 1)
+registerDoParallel(cl)         ## all set to go
+@
+
+\newslide
+<<para1,cache=TRUE>>=
+N <- 10000                         ## Number of simulations, go big time
+chunks <- idiv(N, chunks = cores - 1)  ## farm one bit out to each core?
+QR <- hp_model$qr
+Res <- foreach(nsim = chunks,     ## fed out by the iterator.
+               .combine = cbind,
+               .inorder = FALSE,  ## allows load balancing
+               .export = "Boston") %dopar% {
+                 Sims <- simulate(hp_model, nsim = nsim)
+                 Sims <- qr.resid(QR, as.matrix(Sims))
+
+                 ## line below equivalent to: apply(Sims, 2, sort)
+                 matrix(Sims[order(col(Sims), Sims)], nrow = nrow(Sims))
+               }
+itRes <- iter(Res, by = "row")
+Res <- foreach(r = itRes, .combine = rbind) %dopar%
+  ## quantile(r, prob = c(0.025, 0.975))  ## too stringent?
+  sort(r)[c(50, length(r)-49)]              ## just clip off the fuzz
+
+##################### finalisation
+stopCluster(cl)
+rm(cl)
+@
+\newslide
+Now assemble the pieces and make a picture:
+<<para2>>=
+colnames(Res) <- c("Low", "Upp")
+rdat <- cbind(rdat, Res) %>%
+  within({
+    ns <- qnorm(ppoints(length(res)))  ## normal scores
+    res <- sort(res)
+    range <- ifelse(res <  Low, "low", ifelse(res > Upp, "high", "normal"))
+    range <- factor(range, levels = c("low", "normal", "high"))
+  })
+
+### show the results
+ggplot(rdat) + aes(x = ns, y = res, colour = range) + geom_point() +
+  geom_step(aes(y = Low), direction = "hv", col = "grey") +
+  geom_step(aes(y = Upp), direction = "vh", col = "grey") +
+  labs(x="Normal scores", y="Sorted residuald",
+  title="Parametric Bootstrap Envelope for Boston HP Data Residuals") +
+  theme(legend.position = c(0.1, 0.9)) +
+  scale_colour_brewer(palette = "Set1")
+@
+% \newslide
+% \subsection{All possible regressions}
+% \label{sec:apr}
+% <<include=FALSE>>=
+%   if("package:MASS" %in% search()) detach("package:MASS")
+% @
+% This is the only way to be \emph{sure} you have found the best model by
+% either the AIC, or the BIC, or \dots{} criterion.
+% 
+% We stick with the \rcode{Boston} example, which has a moderate number of
+% predictors from which to choose:
+% <<apr>>=
+% X <- cbind(`1` = 1, Boston %>% select(-medv) %>% as.matrix)
+% y <- Boston$medv
+% 2^(ncol(X) - 1)  ## total number of regressions.  Intercept is fixed.
+% @
+% 
+% First write a slick function that will get us all we need for AIC or BIC:
+% <<apr2>>=
+% Rss <- function(X, y) {
+%   p <- ncol(X)
+%   edf <- nrow(X) - p
+%   rss <- sum(qr.resid(qr(X), y)^2)
+%   c(edf = edf, p = p, rss = rss)
+% }
+% @
+% \newslide
+% Then we need to list, in some way, the columns of \rcode{X} to be
+% selected each time.  The first column is always selected.  There
+% are $2^{13} = \Sexpr{2^13}$ possible subsets, so how to we enumerate
+% them?  A clue is to use the binary digits of the number:
+% <<apr3>>=
+% as.logical(intToBits(2145))[1:(ncol(X) - 1)]
+% c(1, which(as.logical(intToBits(2345)[1:(ncol(X) - 1)])) + 1)
+% @
+% You get the picture.  It is better to leave it as a logical index, though.
+% <<>>=
+% vars <- local({
+%   ncx <- ncol(X) - 1
+%   function(num) {
+%     c(TRUE, as.logical(intToBits(num))[1:ncx])
+%   }
+% })
+% @
+% We now compare for speed a parallel and a non-parallel version.
+% 
+% % \newslide
+% First, the parallel version:
+% <<apr4>>=
+% library(doParallel)
+% 
+% t0 <- system.time({
+%   cores <- detectCores(logical = FALSE)  ## real cores, please!
+%   cl <- makeCluster(cores-1)
+%   registerDoParallel(cl)
+% 
+%   nos <- 0:(2^(ncol(X) - 1) - 1)       ### This is the trick
+%   bits <- factor(rep_len(1:(cores-1), length.out = length(nos)))
+%   iset <- isplit(nos, bits)            ### This is the trick
+% 
+%   APRp <- foreach(xset = iset, .inorder = FALSE,
+%                   .multicombine = TRUE, .combine = rbind) %dopar%
+%     with(xset, {
+%       res <- matrix(NA_real_, length(value), ncol(X) + 3)
+%       for(i in seq_along(value)) {
+%         set <- vars(value[[i]])
+%         res[i, ] <- c(Rss(X[, set, drop = FALSE], y), drop(set))
+%       }
+%       res
+%     }) %>%
+%     as.data.frame() %>%
+%     setNames(c("edf", "p", "rss", colnames(X))) %>% arrange(p, rss)
+%   stopCluster(cl)
+%   rm(cl)
+% })
+% dim(APRp)    ## regressions (rows) x [variables (14) + edf + p + rss]
+% @
+% \newslide
+% Now, the single core version and the timing comparison:
+% <<apr5>>=
+% t1 <- system.time({
+%   APR <- sapply(0:(2^(ncol(X)-1)-1), function(i) {
+%     set <- vars(i)
+%     c(Rss(X[, set, drop = FALSE], y), drop(set))
+%   }) %>% t() %>% as.data.frame() %>%
+%     setNames(c("edf", "p", "rss", colnames(X))) %>%
+%     arrange(p, rss)
+% })
+% all.equal(APRp, APR) ## are we on the same page?
+% rbind(Parallel = t0, `Single core` = t1)
+% @
+% The result is a reminder of the high level of setup involved in
+% parallel computation, and the overhead involved in piecing things
+% together at the end.
+% \newslide
+% Now for the optimization:
+% <<apr6>>=
+% BestPR <- APRp %>%
+%   filter(!duplicated(p)) %>%
+%   within({
+%     n <- p + edf
+%     BIC <- n*log(rss/n) + log(n)*p
+%     AIC <- n*log(rss/n) +      2*p
+%     BICdev <- BIC - min(BIC)
+%     AICdev <- AIC - min(AIC)
+%     AIC <- BIC <-X1 <- `1` <- edf <- rss <- n <- NULL
+%   })
+% 
+% o <- order(colSums(BestPR[, 2:14]), decreasing = TRUE)
+% BestPR <- BestPR[, c(1, o + 1, 15:16)]
+% @
+% The variables have been ordered according to their regression importance.
+% 
+% <<apr7a,eval=FALSE>>=
+% BestPR %>%
+%   booktabs(digits = c(rep(0,15), rep(3,2))) %>%
+%   print(include.rownames = FALSE)
+% @
+% \newslide
+% 
+% Both \rcode{AIC} and \rcode{BIC} criteria lead to the same model,
+% which has all predictors included except \rcode{indus} and \rcode{age}:
+% \begin{center}
+% \begin{tiny}
+% <<apr7,echo=FALSE,results="asis">>=
+% BestPR %>%
+%   booktabs(digits = c(rep(0,15), rep(3,2))) %>%
+%   print(include.rownames = FALSE)
+% @
+% \end{tiny}
+% \end{center}
+
+\newslide
+\subsection{Combining random forests}
+\label{sec:rfcombine}
+
+The \rfile{randomForest} fitting function is typically very fast, but
+for large data sets we might want to farm out some of the calculation
+to several cores, or several \emph{nodes}.  If we do so, how do we
+re-assemble the separate trees  into one random forest  object?  The
+package itself has provided a function, \rcode{combine}, for just this
+purpose.
+\newslide
+The churn ``data'' again.
+
+<<line_334_,out.lines=6>>=
+fname <- system.file("extdata", "churnData.csv.gz", package = "WWRCourse")
+churnData <- read_csv(gzfile(fname),     ## neater read (for eventual notebook)
+                      col_types = cols(.default = col_double(),
+                                       state = col_character(),
+                                       area_code = col_character(),
+                                       international_plan = col_character(),
+                                       voice_mail_plan = col_character(),
+                                       churn = col_character(),
+                                       sample = col_character())) %>%
+  unclass() %>% data.frame(stringsAsFactors = TRUE) %>% select(-sample) 
+names(churnData) %>% noquote()
+@
+\newslide
+Consider a random forest approach.
+<<line_349_>>=
+suppressPackageStartupMessages(library(randomForest))
+rfm <- randomForest(churn ~ ., churnData)
+rfm
+## note how redundant 'charge' and 'minutes'variables get level pegging
+varImpPlot(rfm)
+@
+\newslide
+The \rfile{randomForest} package has tools that allow the forest to be built up
+progressively in parallel.
+<<line_359_>>=
+cl <- makeCluster(cores - 2)
+registerDoParallel(cl)         ## all set to go
+ntree <- idiv(5000, chunks = max(5, cores - 2))
+t1 <- system.time({
+  bigRf <- foreach(ntree = ntree,
+                   .combine = randomForest::combine, ## one in dplyr!
+                   .packages = "randomForest",
+                   .inorder = FALSE) %dopar% {
+                     randomForest(churn ~ ., churnData, ntree = ntree)
+                   }
+})
+stopCluster(cl)
+rm(cl)
+varImpPlot(bigRf)
+@
+Now for a serial version:
+<<comb_tree>>=
+ntree <- idiv(5000, chunks = max(5, cores - 2))
+t2 <- system.time({
+  bigRf <- foreach(ntree = ntree,
+                   .combine = randomForest::combine, ## one in dplyr!
+                   .packages = "randomForest",
+                   .inorder = FALSE) %do% {       ### <<<--- only change!
+                     randomForest(churn ~ ., churnData, ntree = ntree)
+                   }
+})
+rbind(serial = t2, parallel = t1)[, c("user.self", "sys.self", "elapsed")]
+@
+
+
+
+% \newslide
+% Example: Boston House Price data once more.
+% <<bost1,fig.show="hold">>=
+% library(randomForest)
+% cl <- makeCluster(cores - 2)
+% registerDoParallel(cl)         ## all set to go
+% 
+% ntree <- idiv(5000, chunks = max(5, cores - 2))
+% bigRf <- foreach(ntree = ntree,
+%                  .combine = randomForest::combine, ## one in dplyr!
+%                  .export = "Boston",  ## This is needed as 'Boston' not local
+%                  .packages = "randomForest",
+%                  .inorder = FALSE) %dopar% {
+%                    randomForest(medv ~ ., Boston, ntree = ntree)
+%                  }
+% varImpPlot(bigRf)
+% stopCluster(cl)
+% rm(cl)
+% @
+\newslide
+\section{Bootstrap aggregation revisited}
+\label{sec:bagging}
+
+We look again at the problem of using parallelism to speed up the
+construction of a forest of bootstrapped trees. (Cf. presentation~09).
+
+Recall that the non-parallel version looked like this:
+\newslide
+<<tbag1>>=
+bagRpart <- local({
+  bsample <- function(dataFrame) # bootstrap sampling
+    dataFrame[sample(nrow(dataFrame), rep = TRUE),  ]
+  function(object, data = eval.parent(object$call$data),
+           nBags=600, type = c("standard", "bayesian"), ...) {
+    type <- match.arg(type)
+    bagsFull <- vector("list", nBags)
+    if(type == "standard") {
+      for(j in 1:nBags)
+          bagsFull[[j]] <- update(object, data = bsample(data))
+      } else {
+        nCases <- nrow(data)
+        for(j in 1:nBags)
+            bagsFull[[j]] <- update(object, data = data, weights = rexp(nCases))
+        }
+    class(bagsFull) <- "bagRpart"
+    bagsFull
+  }
+})
+@
+\newslide
+
+For the parallel version, we need an iterator for random
+exponential deviates.  This can be done using a trick.
+
+<<bagg1,fig.height=3,fig.width=4.5,out.height="3.5in">>=
+library(doParallel) ## parallel backend; includes other pkgs
+(cores <- detectCores())  ## how many real cores?
+
+cl <- makeCluster(cores-1)
+registerDoParallel(cl)
+@
+%%\newslide
+A modified version of the fitting function.  Some care needed:
+
+<<bagg2>>=
+bagRpartParallel <- local({
+  bsample <- function(dataFrame) # bootstrap sampling
+    dataFrame[sample(nrow(dataFrame), rep = TRUE),  ]
+  
+  function(object, data = eval.parent(object$call$data),
+           nBags = 600, type = c("standard", "bayesian"), ...,
+           cores = detectCores() - 1, seed0 = as.numeric(Sys.Date())) {
+    type <- match.arg(type)
+    bagsFull <- foreach(j = idiv(nBags, chunks=cores), seed = seed0+seq(cores),
+                        .combine = c, .packages = c("rpart", "stats"), 
+                        .inorder = FALSE, .export = c("bsample")) %dopar% {
+                          ## now inside a single core
+                          set.seed(seed = seed)
+                          if(type == "standard") {
+                            replicate(j, simplify = FALSE, 
+                                      update(object, data = bsample(data)))  
+                          } else {
+                            replicate(j, simplify = FALSE,
+                                      update(object, data = data,
+                                             weights = rexp(nrow(data))))
+                          }
+                          ## end of single core mode
+                        }
+    class(bagsFull) <- "bagRpart"
+    bagsFull
+  }
+})
+@
+\newslide
+A timing comparison
+
+<<bagg3,cache=TRUE>>=
+set.seed(12345) ##
+library(rpart)
+Obj <- rpart(medv ~ ., Boston, minsplit = 5, cp = 0.005)  ## expand the tree
+rbind(
+  simple    = system.time(HPSBag  <- bagRpart(Obj, nBags=600)),
+  bayes     = system.time(HPBBag  <- bagRpart(Obj, nBags=600, type="bayes")),
+  parallel_s= system.time(HPSBagP <- bagRpartParallel(Obj, nBags=600)),
+  parallel_b= system.time(HPBBagP <- bagRpartParallel(Obj, nBags=600,
+                                                   type="bayes")))[, 
+                                  c("user.self", "sys.self", "elapsed")]
+rm(Obj)
+@
+<<bagg3a>>=
+stopCluster(cl)  ## release resources
+rm(cl)
+@
+
+\newslide
+Exercises:
+\begin{itemize}
+\item Check that the parallel version \rcode{barRpartParallel} still
+  works on the credit card data.
+\item The \rfile{Boston} data has a continuous response whereas the
+  credit card data had a categorical response.  The predictor we wrote
+  previously only catered for categorical responses.
+
+  Write a general (enough) prediction method for \rcode{"bagRpart"}
+  objects, i.e. general enough to handle both classification and
+  regression tree cases.
+\end{itemize}
+\newslide
+One solution:
+<<>>=
+predict.bagRpart <- function(object, newdata, ...,
+                             method = object[[1]]$method) {
+  switch(method,
+         class = {
+           X <- sapply(object, predict, newdata = newdata, type = "class")
+           candidates <- levels(predict(object[[1]], type = "class"))
+           X <- t(apply(X, 1, function(r) {
+             table(factor(r, levels = candidates))
+           }))
+           factor(candidates[max.col(X)], levels = candidates)
+         },
+         anova = {
+           X <- sapply(object, predict, newdata = newdata, type = "vector")
+           rowMeans(X)
+         },
+         NA)
+}
+
+@
+
+\newslide
+% \clearpage
+\phantomsection
+\addcontentsline{toc}{section}{References}
+\nocite{revolution:_2015}
+\bibliography{refs}
+% <<echo=FALSE>>=
+% stopImplicitCluster()
+% @
+
+\newslide
+\phantomsection
+\addcontentsline{toc}{section}{Session information}
+\section*{Session information}
+\label{sec:sessinfo}
+\vspace{-10pt}
+\begin{tiny}
+<<sessionInfo,echo=FALSE,results="asis",out.lines=200>>=
+cat("{\\bf\nDate: ", format(today()), "\n}")
+toLatex(sessionInfo(), locale = FALSE)
+@
+\end{tiny}
+
+\end{slide}
+
+\end{document}

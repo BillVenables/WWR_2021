@@ -1,0 +1,71 @@
+\documentclass{seminar}
+\usepackage[utf8]{inputenc}
+
+\usepackage{RlogoNew}
+\usepackage{Rcolors}
+
+\usepackage{tabularx}
+\usepackage{SeminarExtra}
+\usepackage{op}
+
+\renewcommand{\hlcom}[1]{\textcolor[rgb]{0.625,0.125,0.9375}{\textsl{#1}}}%
+\renewcommand{\code}[1]{\textsl{\texttt{#1}}}
+\newcommand{\spreadout}{$\vphantom{\big\{}$\xspace}
+
+\DeclareGraphicsExtensions{.pdf,.png,.jpg,.JPG}
+\graphicspath{{Fig/}}
+
+<<"prelim",child="00-Prelim.Rnw">>=
+@
+
+<<setFigPath,include=FALSE>>=
+.infile <- sub("\\.Rnw$", "", knitr::current_input())
+knitr::opts_chunk$set(fig.path = paste0('Fig/', .infile, "_")) #$
+session <- sub("^0+", "", sub("[^[:digit:][:alpha:]].*$", "", .infile))
+@ 
+
+
+\usepackage{natbib}
+\bibliographystyle{chicago}
+
+\title{\Large \input{title.tex}
+  \Huge \red{Session \Sexpr{session}:\\[10pt]
+    Main Title}}  %%% Change needed
+
+\input{authorAndDate}
+
+\begin{document}
+\setkeys{Gin}{keepaspectratio=TRUE}
+
+\begin{slide}
+\slidepagestyle{empty}
+
+  {\color{darkgreen}\maketitle}
+\end{slide}
+
+\begin{slide}
+\slidepagestyle{plain}
+\setcounter{slide}{1}
+
+\tableofcontents
+\newslide
+
+\newslide
+\phantomsection
+\addcontentsline{toc}{section}{Session information}
+\section*{Session information}
+\label{sec:sessinfo}
+
+\begin{tiny}
+<<sessionInfo,echo=FALSE,results="asis",out.lines=200>>=
+cat("{\\bf\nDate: ", format(Sys.Date()), "\n}") 
+toLatex(sessionInfo(), locale = FALSE)
+@ %def
+\end{tiny}
+
+
+
+\end{slide}
+
+\end{document}
+

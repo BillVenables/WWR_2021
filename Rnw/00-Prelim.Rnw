@@ -1,0 +1,118 @@
+<<prelim,include=FALSE,tidy=FALSE>>=
+
+
+
+################
+### knitr settings
+################
+.out0 <- knit_hooks$get("output") 
+knit_hooks$set(output = function(x, options) { #$
+  if(!is.null(n <- options$out.lines) && 
+     is.numeric(n) && 
+     length(n) == 1 && 
+     is.finite(n) && 
+     n > 0) {
+    x <- unlist(strsplit(x, "\n"))
+    if(length(x) > n) {
+      x <- c(head(x, ceiling(n/2)), "....", tail(x, floor(n/2)), "")
+    }
+    x <- paste(x, collapse = "\n")
+  }
+  .out0(x, options)
+})
+
+knit_hooks$set(lattice = function(before, options, envir) { #$
+  if(before) {
+    suppressPackageStartupMessages(require(lattice))
+    lattice.options(default.args = list(as.table = TRUE))
+  } else {
+    NULL
+  }
+})
+
+opts_chunk$set(size = 'footnotesize',  #$
+               ##               out.lines = 6,
+               background = "#F4FCFE",
+               fig.width = 9, 
+               fig.height = 7,
+               # out.width = '1.0\\linewidth',
+               # out.height = '1.0\\textheight',
+               out.width = '100%',
+               out.height = '100%',
+               ## out.height='0.43\\textheight',
+               ## cache = TRUE,
+               # comment = "# ",
+               comment = "",
+               warning = FALSE,
+               fig.align="center",
+               tidy.opts = list(keep.comment = TRUE,  
+                                keep.blank.line = FALSE,
+                                keep.space = TRUE,
+                                left.brace.newline = FALSE,
+                                replace.assign = TRUE,
+                                reindent.spaces = 2),
+               tidy = FALSE)
+
+inline_hook <- function(x) {
+    if(is.numeric(x)) x <- round(x, 2)
+    paste(as.character(x), collapse = ", ")
+}
+knit_hooks$set(inline = inline_hook)
+
+library(xtable)
+options(width = 75, xtable.booktabs = TRUE)
+
+###############################################################################
+### 8< cut here 8< ### 8< cut here 8< ### 8< cut here 8< ### 8< cut here 8< ###
+###               REMOVE or COMMENT OUT everything above here               ###
+###############################################################################
+
+################
+### R settings
+################
+
+###
+set.seed(20210202)  ## for reproducibility
+###
+
+suppressPackageStartupMessages({
+  # library(SOAR)
+  library(english)
+  library(ggthemes)
+  library(scales)
+  library(patchwork)
+  library(gridExtra)
+  library(lattice)
+  library(WWRCourse)
+})
+
+
+newTheme <- theme_minimal(base_family = "sans")  + 
+    theme(plot.title = element_text(hjust = 0.5)) + 
+    theme(strip.background = element_rect(fill = "#FFE5CC"))
+oldTheme <- theme_set(newTheme)
+
+
+Attach(lib = .Robjects)
+._objects <- intersect(ls(".Robjects"), ls("package:WWRCourse"))
+if(length(._objects) > 0) 
+  Remove(list = ._objects, lib = .Robjects)  ## remove duplicates
+rm(._objects)
+Attach()
+Remove(list = Ls())  ## clean up working .R_Cache
+rm(list = ls())      ## clean up workspace ... for now.
+
+options(show.signif.stars = FALSE)   ## signif.stars are for wimps...
+
+setHook("plot.new", 
+        function() par(las = 1, pch = 20),
+        "append")
+
+###################
+### additional software
+###################
+
+
+
+@ %def
+

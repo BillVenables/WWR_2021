@@ -1,0 +1,756 @@
+\documentclass{seminar}
+\usepackage[utf8]{inputenc}
+
+\usepackage{RlogoNew}
+\usepackage{Rcolors}
+
+\usepackage{tabularx}
+\usepackage{SeminarExtra}
+\usepackage{op}
+
+\renewcommand{\hlcom}[1]{\textcolor[rgb]{0.625,0.125,0.9375}{\textsl{#1}}}%
+
+\DeclareGraphicsExtensions{.pdf,.png,.jpg,.JPG}
+\graphicspath{{Fig/}}
+
+<<"prelim",child="00-Prelim.Rnw">>=
+@
+
+<<setFigPath,include=FALSE>>=
+.infile <- sub("\\.Rnw$", "", knitr::current_input())
+knitr::opts_chunk$set(fig.path = paste0('Fig/', .infile, "_")) #$
+session <- sub("^0+", "", sub("[^[:digit:][:alpha:]].*$", "", .infile))
+@ 
+
+
+\usepackage{natbib}
+\bibliographystyle{chicago}
+
+\title{\Large \input{title.tex}
+  \Huge \red{Session \Sexpr{session}:\\[10pt]
+    Case Studies}}  %%% Change needed
+
+\input{authorAndDate}
+
+\begin{document}
+\setkeys{Gin}{keepaspectratio=TRUE}
+
+\begin{slide}
+\slidepagestyle{empty}
+
+  {\color{darkgreen}\maketitle}
+\end{slide}
+
+\begin{slide}
+\slidepagestyle{plain}
+\setcounter{slide}{1}
+
+\tableofcontents
+\newslide
+\section{Darwins Finches}
+\label{sec:Darwins Finches}
+
+The \rcode{DarwinsFinches} data set comes from an historical expedition to the Galapagos Islands
+in 1898-99.  It gives various anatomical measurements for \Sexpr{words(nrow(DarwinsFinches))}
+finch specimens, classified into \Sexpr{words(length(levels(DarwinsFinches$Species)))} species.
+Our task will be to show to what extent the
+anatomical measurements alone can separate out the species.  We will use the classical
+discriminant function method and display the results in two dimensions only.
+
+We will do the computations ``by hand'' to illustrate how things can be done, elegantly,
+using elementary tools.
+\newpage
+<<>>=
+find("DarwinsFinches")
+str(DarwinsFinches)
+@
+\newslide
+
+Note: Factors with \emph{level names with leading or trailing blanks} can
+cause problems in \rcode{ggplot} graphics.  Sometimes useful to check this.
+
+<<>>=
+with(DarwinsFinches, levels(Species))
+@
+We also set a few items useful later:
+<<>>=
+## choose species colours
+spCols <- c(`Geospiza fortis fortis` =             "#006400",  ## "darkgreen"
+            `Geospiza fortis platyrhyncha` =       "#9BCD9B",  ## "darkseagreen3"
+            `Geospiza heliobates`  =               "#B22222",  ## "firebrick"
+            `Geospiza fuliginosa parvula` =        "#8B4513",  ## "chocolate4"
+            `Geospiza prosthemelas prosthemelas` = "#F4A460")  ## "sandybrown"
+sub_text <-  ## for a citation line
+  "(Darwins Finch data, Hopkins-Stanford Galapagos Expedition, 1898-99)"
+@
+\newslide
+\textbf{Waffly outline}
+
+A simple discriminant function analysis is really just a matrix version
+of a single classification analysis of variance, with some extensions and
+matrix operations of various kinds replacing simpler arithmetic ones in the
+univariate case.
+
+<<>>=
+Species <- with(DarwinsFinches, Species) ## Species factor
+n <- length(Species)                     ## sample size (= 146)
+species <- levels(Species)               ## species names
+p <- length(species)                     ## number of species (= 5)
+
+Y <- as.matrix(select(DarwinsFinches, BodyL:TarsusL)) ## responses
+
+M0 <- apply(Y, 2, ave)                   ## grand mean
+M1 <- apply(Y, 2, ave, Species)          ## species means
+
+B <- crossprod(M1 - M0)/(p - 1)          ## between species MSq
+W <- crossprod(Y  - M1)/(n - p)          ## withing species MSq
+@
+\newslide
+Now that we have the ``Between'' and ``Within'' mean SSQ matrices, the
+main discriminant function calculation is to solve the generalized eigenvalue
+problem
+$$(B - \lambda W){\boldsymbol\alpha}=\mathbf{0}$$
+The eigenvalues $\lambda_i$ are the analogue(s) of the $F-$statistics, and the 
+eigenvectors, ${\boldsymbol\alpha}_i$ the discriminant function coefficients.
+
+We have a special function \rcode{eigen2} in \verb|WWRUtilities| to solve these
+generalized eigenvalue problems, for symmetric matrices, in a stable way.
+
+<<>>=
+ev <- eigen2(B, W)                            ## critical computation
+print(with(ev, zapsmall(values)), digits = 3) ## "F-statistics" should be (p-1)
+
+alpha <- with(ev, vectors[, 1:(p-1)])                 ## coefficients
+Scores <- (Y - M0) %*% alpha                          ## discriminant functions
+Finch <- cbind(DarwinsFinches, data.frame(Scores))    ## augmented data
+noquote(setdiff(names(Finch), names(DarwinsFinches))) ## extra names
+@
+\newslide
+\subsection{Display the results}
+\label{sub:Display the results}
+
+We compare a traditional graphics plot with a \rcode{ggplot2} version.  First,
+a traditional plot.
+
+<<>>=
+with(Finch, plot(X1, X2, xlab="First DF", ylab="Second DF", las=1,
+                 col=spCols[Species], pch=16, cex=0.7,
+                 panel.first=grid(lty="dashed", lwd=0.5, nx=7)))
+by(Finch, Species, FUN=function(dat) with(dat, {
+  spColour <- spCols[Species[1]]                ## get species col
+  z <- complex(real=X1, imaginary=X2)           ## complex trick!
+  points(mean(z), pch=3, cex=1.5, col=spColour) ## centroid
+  polygon(z[chull(z)], col="transparent",
+          border=spColour)                      ## convex hulls
+})) %>% invisible()                             ## toss dummy output
+mtext(sub_text, side=1, line=4, adj=1, cex=0.75, family="serif")
+par(family="serif")                           ## outside legene()
+legend("topleft", species, pch=16, lty="solid", col=spCols, cex=0.8,
+       title="Species", text.font=3, title.adj=0.025, bty="n",
+       inset=c(0.0125, 0.0125))
+@
+\newslide
+Now for a \rcode{ggplot()} version.  The computations need to be done
+prior to the construction of the plot object.
+<<>>=
+finch_centroids <- Finch %>%          ## for the central points
+  group_by(Species) %>%
+  summarise(X1 = mean(X1), X2 = mean(X2)) %>%
+  ungroup()
+
+finch_hulls <- Finch %>%              ## this is the tricky one
+  group_by(Species) %>%
+  do(., with(., {                     ## the complex trick does
+    h <- chull(cbind(X1, X2))         ## not work with ggplot() 
+    data.frame(Species = Species[h], X1 = X1[h], X2 = X2[h])
+  })) %>%
+  ungroup()
+@
+\newslide
+An alternative using a combination of new and more traditional tools:
+<<>>=
+separate_species <- split(Finch, Species)  ## a list of 5 data frames
+finch_centroids_1 <- separate_species %>% 
+  lapply(function(dat) with(dat, 
+                            data.frame(Species = Species[1], 
+                                       X1 = mean(X1), 
+                                       X2 = mean(X2)))) %>%
+  do.call(rbind, .)
+finch_hulls_1 <- separate_species %>% 
+  lapply(function(dat) with(dat, {
+    h <- chull(cbind(X1, X2))
+    data.frame(Species = Species[h],
+               X1 = X1[h],
+               X2 = X2[h])
+  })) %>% do.call(rbind, .)
+@
+
+\newslide
+The display is now straightforward
+<<>>=
+plt <- ggplot() + 
+  aes(x = X1, y = X2, color = Species) +  ## inherited to all
+  geom_point(data = Finch) +
+  geom_point(data = finch_centroids, shape = 3, size = 3) +
+  geom_polygon(data = finch_hulls, fill = "transparent") +
+  scale_color_manual(values = spCols) +
+  labs(caption = sub_text, x = "First DF", y = "Second DF") +
+  theme_bw() +
+  theme(legend.position = c(0.19, 0.85),
+        legend.text = element_text(family = "serif",
+                                   face = "italic", size = 11))
+plt
+@
+
+
+
+
+\newslide
+\section{The churn data}
+\label{sec:The churn data}
+
+\begin{quote}
+  ``Customer churn'' refers to [the situation] when a customer (player, subscriber, user, \&c.) ceases his or 
+  her relationship with a company.  Online businesses typically treat a customer as churned
+  once a particular amount of time has elapsed since the customer's last interaction with the site or service.
+  
+  Dr Google, 2019-01-24
+\end{quote}
+
+\begin{itemize}
+  \item A \rcode{churn} data set is provided, in raw form, in the \rfile{extdata} folder of the \rfile{WWRCourse} package
+\end{itemize}
+
+<<line_066_>>=
+dir(system.file("extdata", package = "WWRCourse"))
+@
+
+\newslide
+The file is compressed but to read it in does not require it to be de-compressed first
+
+<<line_073_,out.lines=6>>=
+fname <- system.file("extdata", "churnData.csv.gz", package = "WWRCourse")
+churnData <- read_csv(gzfile(fname))     ## initial read
+@
+
+To suppress this warning, use the output to make a neater read for your eventual script
+
+<<line_080_>>=
+churnData <- read_csv(gzfile(fname),     ## neater read (for eventual notebook)
+                      col_types = cols(.default = col_double(),
+                                       state = col_character(),
+                                       area_code = col_character(),
+                                       international_plan = col_character(),
+                                       voice_mail_plan = col_character(),
+                                       churn = col_character(),
+                                       sample = col_character()))
+names(churnData) %>% noquote()
+@
+
+\newslide
+
+\begin{itemize}
+  \item The data frame is from a \emph{Kaggle} competition and details of the data, (assumed genuine), are sparse.  
+  \item The sampled entities are previous customers of a large telecommunications company.
+  \item The response is \rcode{churn}, a character variable with two possible values.
+  \item The data is already split into \rcode{train} and \rcode{test} samples, as given by the final column.
+  \item The challenge is to build a predictor for the response.
+\end{itemize}
+
+<<line_102_>>=
+dim(churnData)
+with(churnData, table(churn, sample))
+@
+
+\subsection{Character variables to factors: chaining}
+\label{sub:Character variables to factors}
+
+\begin{itemize}
+  \item The function \rcode{read\_csv} produces a result of class \rcode{"tibble"}, an enhanced \rcode{data.frame}.
+  \item By default, ``\rcode{tibble}''s have character variables where usually \rcode{data.frame}s have \rcode{factor}s. [Until R 4.0.0 changed this!]
+  \item For modelling purposes, factors are needed rather than character strings.  How do we do it?
+<<line_114_>>=
+churnData <- data.frame(unclass(churnData), stringsAsFactors = TRUE)
+@
+  \item The \emph{chain operator}, \rcode{\%>\%}, (also known as a \emph{pipe} operator) allows this
+  kind of nested expression to be written in a linear form that is easier to disentangle:
+<<line_119_,eval=FALSE>>=
+churnData <- churnData %>%                ## start with the data...
+  unclass(.)           %>%                ## then remove the class()...
+  data.frame(., stringsAsFactors = TRUE)  ## then make it a data.frame()
+@
+  The ``dot'' place-holder, \rcode{.}, may be omitted if it is the first argument.
+\end{itemize}
+\newslide
+
+\subsection{A first look at the data}
+\label{sub:A first look}
+
+First let's shorten the names a bit and make a small change to the \rcode{area\_code} variable
+
+<<line_133_>>=
+churnData <- churnData %>% 
+  within({
+    area_code <- sub("^area_code_", "", area_code) %>% 
+      factor()
+  })
+with(churnData, table(area_code))
+@
+\newslide
+
+There is some redundancy in the data.  A simple graphical exploration:
+
+<<line_145_,fig.keep="last">>=
+names(churnData) <- sub("^(total|number)_", "", names(churnData)) ## neater
+tots <- churnData %>% select(ends_with("_minutes"),
+                             ends_with("_charge"),
+                             ends_with("_calls"))
+pairs(tots, pch = ".")         ## old technology! (result not shown)
+######
+## cut down the number of panels and group variables for effect
+######
+tots <- tots %>% 
+  select(starts_with("day"),   starts_with("eve"),
+         starts_with("night"), starts_with("intl"),
+         -ends_with("_calls"))              ## remove the calls
+pairs(tots, pch = ".", col = "cadet blue")  ## notice anything odd?
+@
+\newslide
+\subsubsection{The \rcode{ggplot} \code{pairs} alternative}
+\label{ssub:The ggplot alternative}
+
+The \rcode{ggplot} version of \rcode{pairs} is non-standard with regards
+to the normal \rcode{ggplot} call structure.  It is provided in the
+(somewhat eccentric) \rcode{GGally} package.  (The \textit{Corr:} annotation
+is hard-wired!)
+
+
+<<line_170_, message=FALSE>>=
+suppressPackageStartupMessages({
+  library(GGally)
+})
+ggpairs(data = tots,
+        upper = list(continuous=wrap("cor", size=3, fontface="bold", 
+                                     colour="saddlebrown")),
+        diag = list(continuous=wrap("barDiag", bins=20)),
+        lower = list(continuous=wrap("points", size=0.5,
+                                     colour=alpha("skyblue", 1/10))))
+@
+
+\newslide
+The ``\rfile{\_charge}'' variables are almost an exact re-scaling of
+the corresponding ``\rfile{\_minutes}'' variables.  Look at the key block or correlations:
+
+<<line_185_>>=
+cor(churnData %>% select(ends_with("_minutes")),
+    churnData %>% select(ends_with("_charge")))
+@
+
+Two issues:
+\begin{itemize}
+  \item The correlations between corresponding minutes and charge variables are
+    \emph{far too high}, indicating they are essentially the \emph{same} variable,
+    just expressed in different units.
+  \item The correlations between other pairs of variables are
+    \emph{uniformly too low} to be fully credible!
+\end{itemize}
+
+The data is almost certainly, \emph{fake}!  Disappointing, but not surprising.
+\newslide
+\subsection{Looking at proportions}
+\label{sub:Looking at proportions}
+
+\begin{itemize}
+  \item So far only considered \emph{predictors}.  What about the response?
+  \item \rcode{state} and \rcode{day\_minutes} are likely to be useful, so
+  consider a graphical exploration of the \emph{marginal} dependency patterns.
+\end{itemize}
+
+<<line_210_>>=
+state_props <- churnData             %>% 
+  group_by(state)                    %>% 
+  summarise(n = n(),                         ## state total
+            p = mean(churn == "no")) %>%     ## state proportion
+  arrange(p)                                 ## 'league table' ordering
+head(state_props %>% untibble(), 6)          ## Californians!
+@
+\newslide
+An 'old technology' display:
+<<line_220_,out.height="0.8\\textheight",out.width="1.07\\textheight">>=
+with(state_props,
+     barplot(p, names.arg = state, las = 2, ylim = c(0,1),
+             family = "mono", fill = pal_sea2sand)) ## colours are pointless!!
+@
+\newslide
+A new technology version:
+<<line_227_,out.height="0.6\\textheight",out.width="0.8\\textheight">>=
+state_props <- state_props %>% 
+  mutate(state = factor(as.character(state), levels = as.character(state)))
+ggplot(state_props) + aes(x = state, y = p, fill = p) + ylim(0, 1) +
+  geom_bar(stat = "identity") + scale_fill_viridis_c() + theme_bw() +
+  theme(legend.position="none")
+@
+\newslide
+A continuous predictor: how do we handle that?
+<<line_236_,out.height="0.6\\textheight",out.width="0.8\\textheight">>=
+churn_tmp <- churnData %>% 
+  mutate(ch = (churn == "no") + 0) ## binary numeric
+ggplot(churn_tmp) + aes(x = day_minutes, y = ch) + 
+  geom_point(colour = "steelblue") +
+  geom_smooth(se = FALSE, method = "gam", formula = y ~ s(x, bs = "cs"), 
+              colour = "red")
+@
+\subsubsection{Local weighting: compiled code}
+\label{ssub:Local weighting: compiled code}
+
+Try to do something similar using lower level tools.  Two functions
+<<line_248_>>=
+localWeighting <- function(x, y, scale) {
+  y_wtd <- numeric(length(y))
+  for(i in seq_along(y)) {
+    y_wtd[i] <- weighted.mean(y, w = exp(-((x-x[i])/scale)^2))
+  }
+  y_wtd
+}
+@
+Now for a compiled version using \rfile{Rcpp}:
+\newslide
+<<lwt,engine="Rcpp">>=
+#include <Rcpp.h>
+using namespace Rcpp;
+
+// [[Rcpp::export]]
+NumericVector localWeightCpp(NumericVector x, 
+                             NumericVector y, 
+                             double scale) {
+  int n = y.size();
+  NumericVector y_wtd(n);
+  
+  for(int i = 0; i < n; i++) {
+    double w, swy = 0.0, sw = 0.0;
+    for(int j = 0; j < n; j++) {
+      w = exp(-pow((x[i] - x[j])/scale, 2));
+      swy += w * y[j];
+      sw += w;
+    }
+    y_wtd[i] = swy/sw;
+  }
+  return y_wtd;
+}
+@
+\newslide
+Try it out
+<<line_284_>>=
+yw1 <- with(churn_tmp, localWeighting(day_minutes, ch, scale = 25))
+yw2 <- with(churn_tmp, localWeightCpp(day_minutes, ch, scale = 25))
+all.equal(yw1, yw2)
+@
+
+But what about timing?
+<<line_291_,cache=FALSE>>=
+library(rbenchmark)
+with(churn_tmp, 
+     benchmark(localWeighting(day_minutes, ch, scale = 25),
+               localWeightCpp(day_minutes, ch, scale = 25),
+     replications = 10, columns = c("test", "elapsed", "relative")))
+@
+<<include=FALSE>>=
+if("package:MASS" %in% search()) detach("package:MASS")
+@
+
+
+Finally, how does it compare with the smooth?
+
+<<line_299_,fig.show="hold">>=
+churn_tmp <- churn_tmp %>% 
+  mutate(p_wt = localWeightCpp(day_minutes, ch, scale = 25))
+ggplot(churn_tmp) + aes(x = day_minutes, y = ch) +
+  geom_point(colour = "steelblue") + 
+  geom_smooth(se = FALSE, 
+              method = "gam", formula = y ~ s(x, bs = "cs"), 
+              method.args = list(family = "binomial"), 
+              colour = "red") +
+  geom_line(aes(x = day_minutes, y = p_wt), colour = "dark green") +
+  ylab("Proportion: no churn") + xlab("Daytime minutes")
+###
+### There seems to be broad qualitative agreement.
+@
+\newslide
+An old technology plot to achieve the same purpose:
+<<line_315_>>=
+suppressPackageStartupMessages(library(mgcv))
+greyish <- grey(0.35)
+ghostgrey <-  alpha("grey", 0.5)
+churn_tmp %>% 
+  arrange(day_minutes) %>%   # x now has to be ordered.
+  with({ 
+    plot(day_minutes, ch, pch = 20, axes = FALSE, bty = "n", type = "n",
+         xlab = "Daytime minutes", ylab = "Proportion: no churn",
+         cex.lab = 0.8)
+    axis(1, col = "transparent", col.axis = greyish, 
+         cex.axis = 0.7, col.ticks = ghostgrey)
+    axis(2, col = "transparent", col.axis = greyish, 
+         cex.axis = 0.7, col.ticks = ghostgrey)
+    grid(lty = "solid", col = ghostgrey)
+    points(day_minutes, ch, pch = 20, col = "steelblue")
+    smooth <- fitted(gam(ch ~ s(day_minutes, bs = "cs"), binomial))
+    lines(day_minutes, smooth, col = "red")
+    lines(day_minutes, p_wt, col = "dark green")
+  })
+@
+
+\newslide
+\subsection{Splitting the data}
+\label{sub:Splitting the data}
+
+The data need not be split, but it is handy to do so for convenience in modelling.
+The split data sets should have the \rcode{sample}
+column removed.  We look at a couple of ways to do this.
+
+{\bf The antediluvian method}:
+<<line_346_,size="footnotesize">>=
+sample_column <- which(names(churnData) == "sample")  ## calculate it!
+churn_train <- churnData[churnData$sample == "train", -sample_column]
+churn_test  <- churnData[churnData$sample == "test" , -sample_column]
+@
+
+{\bf The classical method}:
+<<line_353_>>=
+churn_train <- subset(churnData, sample == "train", select = -sample)
+churn_test  <- subset(churnData, sample == "test" , select = -sample)
+@
+
+{\bf The modern method}:
+<<line_359_>>=
+churn_train <- churnData %>% filter(sample == "train") %>% select(-sample)
+churn_test  <- churnData %>% filter(sample == "test" ) %>% select(-sample)
+@
+(To be continued?)
+\newslide
+\section{The Quine data: spreading, gathering and merging}
+\label{sec:The Quine data}
+
+\begin{itemize}
+  \item Children from Walgett, New South Wales, Australia, were classified
+    by Culture, Age, Sex and Learner status and the number of days absent 
+    from school in a particular school year was recorded.
+  \item The quine data frame has 146 rows and 5 columns.
+\end{itemize}
+
+<<line_375_>>=
+find("quine")  ## Check that you have it.  Otherwise quine <- MASS::quine
+str(quine)
+@
+\newslide
+<<line_380_,include=FALSE>>=
+options(xtable.include.rownames=FALSE)
+@
+
+Task 1: tables of counts, means and standard deviations.
+<<line_385_,eval=FALSE>>=
+counts <- with(quine, table(Eth, Sex, Age, Lrn)) %>% 
+  as.data.frame(responseName = "Count")
+pivot_wider(counts, names_from = Age, values_from = Count) %>% booktabs()
+@
+\begin{center}
+<<line_385__,echo=FALSE,results="asis">>=
+<<line_385_>>
+@
+\end{center}
+
+\newslide
+A second display
+<<line_392_,eval=FALSE>>=
+tab <- counts %>% 
+  mutate(AgeSex = Age:Sex) %>% 
+  pivot_wider(id_cols = c(Eth, Lrn),
+              names_from = AgeSex, values_from = Count) %>%
+  arrange(Lrn, Eth)
+booktabs(tab)
+@
+\begin{center}
+<<line_392__,results="asis",echo=FALSE>>=
+<<line_392_>>
+@
+  
+\end{center}
+
+How would we put this table back into the original form?
+\newslide
+I'm glad you asked.
+<<line_403_,out.lines=7>>=
+counts1 <- tab %>% 
+  pivot_longer(names_to = "AgeSex", values_to = "Count", 
+               `F0:F`:`F3:M`) %>%  ## note `...`
+  separate(AgeSex, into = c("Age", "Sex"), sep = ":") %>% 
+  select(names(counts)) %>% 
+  unclass() %>% data.frame() %>% 
+  arrange(Lrn, Age, Sex, Eth)
+# cbind(counts, ".  " = "     ", counts1) ## crude check
+all.equal(counts, counts1)
+@
+The content of \rcode{counts} and \rcode{counts1} is the same,
+but columns are in a different order.\footnote{\textbf{Problem:} 
+Are there any other differences?  How would you check,
+and would you adjust \rcode{counts1} \emph{gracefully}
+so that it becomes identical to the original \rcode{counts}?}
+
+\newslide
+% Means and SDs have to be done differently.
+% 
+% \begin{center}
+% <<line_420_,results="asis">>=
+% means <- with(quine, 
+%   tapply(Days, list(Eth=Eth, Sex=Sex, Age=Age, Lrn=Lrn),
+%          mean)) %>% as.table() %>%
+%   as.data.frame(responseName = "Mean") %>% na.omit()
+% SDs <- with(quine, 
+%   tapply(Days, list(Eth=Eth, Sex=Sex, Age=Age, Lrn=Lrn), 
+%          sd)) %>% as.table() %>% 
+%   as.data.frame(responseName = "SD") %>% na.omit()
+% ## check sizes
+% sapply(list(counts=counts, means=means, SDs=SDs), nrow) %>%  
+%   rbind() %>% booktabs(align = c("r", "@{}c", "c", "c@{}"))
+% @
+% \end{center}
+% \newslide
+% A look at the average days away.
+% \begin{center}
+% <<line_437_,results="asis">>=
+% means %>% 
+%   spread(key = Age, value = Mean) %>% 
+%   arrange(Lrn, Sex, Eth) %>% booktabs
+% @
+% \end{center}
+% 
+% \newslide
+% \subsection{Merging tables}
+% \label{sub:Merging tables}
+% 
+% Now we combine \rcode{counts}, \rcode{means} and \rcode{SDs} them into one table
+% <<line_449_>>=
+% Stats <- counts %>% 
+%   left_join(means, by = c("Eth", "Sex", "Age", "Lrn")) %>% 
+%   left_join(SDs, by = c("Eth", "Sex", "Age", "Lrn")) %>% 
+%   arrange(Eth, Sex, Age, Lrn)
+% dim(Stats)
+% colSums(is.na(Stats))  ## how many induced missing values?
+% head(Stats, 4)
+% @
+% \newslide
+% Using the new tools more completely:
+% <<line_460_>>=
+% Stats <- quine %>% 
+%   group_by(Eth, Sex, Age, Lrn) %>% 
+%   summarise(Count = n(),
+%             Mean = mean(Days),
+%             SD = sd(Days)) %>% 
+%   ungroup() %>% unclass() %>% data.frame() ## clean up!
+% head(Stats, 4)
+% colSums(is.na(Stats))
+% @
+
+\subsection{Mean-variance relationship}
+\label{sub:Mean-variance relationship}
+\begin{itemize}
+  \item The main purpose is to look at the mean-variance relationship:
+  \begin{itemize}
+    \item An approximately linear one would indicate a \code{poisson} or \code{quasipoisson}
+      model for the count response, \rcode{Days}, is appropriate,
+    \item An approximately linear relationship between the mean and 
+    the \emph{standard deviation} suggest something like a \code{Negative Binomial} model
+    for the count response, \rcode{Days}, is appropriate.
+    \item More particularly, the Negative Binomial distribution has a mean-variance relationship
+    of the form
+    $$\mbox{Var}[Y] = \mu + \mu^2/\theta$$
+    We will go to this form directly, as we strongly suspect the NB will be a good model.
+  \end{itemize}
+  \item The plot should contain extra information, but not too much!
+\end{itemize}
+\newslide
+<<line_485_,fig.show="hold">>=
+Stats <- quine %>% 
+  group_by(Age, Sex, Eth, Lrn) %>% 
+  summarise(Count = n(), Mean = mean(Days), S2 = var(Days)) %>% 
+  ungroup() %>% untibble()
+Stats1 <- na.omit(Stats)  ## it will happen anyway!
+#####
+##### mean-variance plot
+##### 
+ggplot(Stats1) + aes(x=Mean, y=S2, size=Count, colour=Sex) +
+  geom_point()  + ylab("Variance") +
+  scale_colour_manual(values = c(F = "hotpink", M = "steelblue")) +
+  stat_smooth(data=Stats1, aes(x=Mean, y=S2, weight = Count), 
+              method="lm", formula = y ~ 0+offset(x)+I(x^2),
+              colour="black", se=FALSE) + 
+  guides(size = "none") + theme(legend.position = c(0.1, 0.85))
+@
+\newslide
+This suggests we could get a good initial estimate for 
+$\theta$, which we can then compare with the maximum likelihood estimate:
+<<>>=
+mv0 <- lm(S2 ~ 0 + offset(Mean) + I(Mean^2), Stats, weights = Count)
+summary(mv0)$coefficients
+(theta_0 <- as.vector(1/coef(mv0)["I(Mean^2)"]))
+(theta_ml <- with(quine, theta.ml(Days, ave(Days, Eth, Sex, Age, Lrn))))
+
+as.vector(theta_0 - theta_ml)/attr(theta_ml, "SE")  ## "quasi-t-statistic" 
+
+@
+
+
+(To be continued.)
+\newslide
+\section{Synopsis}
+\label{sec:Synopsis}
+
+<<line_521_,echo=FALSE,results="asis">>=
+txt <- textConnection('
+  Issue & Tools
+  input & gzfile, read_csv, tibble
+  chainint & %>% binary operator
+  manipulation & five key functions:
+  & select, filter, mutate, group_by, summarise
+  & helper functions:
+  & begins_with, ends_with, contains, everything, ...
+  shaping & two key functions:
+  & gather, spread
+  & helper functions:
+  & separate')
+@
+\begin{center}
+  \begin{tabular}{@{}@{}ll@{}}
+  \toprule Issue & Tools \\ 
+  \midrule   Input  &  \texttt{gzfile}, \texttt{read\_csv}, \texttt{tibble}, \dots \\ 
+    Chaining  &  \texttt{\%$>$\%} binary operator \\ 
+    Manipulation  &  Five key functions: \\ 
+     &\tt  select, filter, mutate, group\_by, summarise \\ 
+     &  Helper functions: \\ 
+     &\tt  begins\_with, ends\_with, contains, everything, \dots \\ 
+    Shaping  &  Two key functions: \tt  pivot\_longer, pivot\_wider \\ 
+     &  Helper functions: \tt  separate \\ 
+    Old technology &\tt with, within, subset, tapply, sapply, lapply, \dots\\
+   \bottomrule 
+   \end{tabular}
+
+\end{center}
+
+\newslide
+\phantomsection
+\addcontentsline{toc}{section}{Session information}
+\section*{Session information}
+\label{sec:sessinfo}
+
+\begin{tiny}
+<<sessionInfo,echo=FALSE,results="asis",out.lines=200>>=
+cat("{\\bf\nDate: ", format(Sys.Date()), "\n}") 
+toLatex(sessionInfo(), locale = FALSE)
+@ %def
+\end{tiny}
+
+
+
+\end{slide}
+
+\end{document}
+

@@ -1,0 +1,610 @@
+\documentclass{seminar}
+\usepackage[utf8]{inputenc}
+
+\usepackage{RlogoNew}
+\usepackage{Rcolors}
+
+\usepackage{tabularx}
+\usepackage{SeminarExtra}
+\usepackage{op}
+
+\renewcommand{\hlcom}[1]{\textcolor[rgb]{0.625,0.125,0.9375}{\textsl{#1}}}%
+\renewcommand{\code}[1]{\textsl{\texttt{#1}}}
+\newcommand{\spreadout}{$\vphantom{\big\{}$\xspace}
+
+\DeclareGraphicsExtensions{.pdf,.png,.jpg,.JPG}
+\graphicspath{{Fig/}}
+
+<<"prelim",child="00-Prelim.Rnw">>=
+@
+
+<<setFigPath,include=FALSE>>=
+.infile <- sub("\\.Rnw$", "", knitr::current_input())
+knitr::opts_chunk$set(fig.path = paste0('Fig/', .infile, "_")) #$
+session <- sub("^0+", "", sub("[^[:digit:][:alpha:]].*$", "", .infile))
+@
+
+
+\usepackage{natbib}
+\bibliographystyle{chicago}
+
+\title{\Large \input{title.tex}
+  \Huge \red{Session \Sexpr{session}:\\[10pt]
+    Some Programming Techniques}}  %%% Change needed
+
+\input{authorAndDate}
+
+\begin{document}
+\setkeys{Gin}{keepaspectratio=TRUE}
+
+\begin{slide}
+\slidepagestyle{empty}
+
+  {\color{darkgreen}\maketitle}
+\end{slide}
+
+\begin{slide}
+\slidepagestyle{plain}
+\setcounter{slide}{1}
+
+\tableofcontents
+
+\newslide
+
+\section{A simulation example}
+\label{sec:balls}
+
+Find by simulation the relative volume of a sphere of diameter 2 to a
+square box of side 2?
+
+For dimensions $d = 1, 2, 3, \ldots$.
+
+The answer is known mathematically. The volume of the sphere of radius
+$r$ is
+\begin{displaymath}
+  V_d^{(S)} = \frac{\pi^{d/2}r^d}{\Gamma\left(d/2+1\right)}
+\end{displaymath}
+and the volume of the square box of side $2r$ is clearly
+$V_c^{(B)}=2^dr^d$.  Hence the relative size is
+\begin{displaymath}
+  R =^{\mbox{def.}}=\frac{V_d^{(S)}}{V_d^{(B)}}=
+  \frac{\pi^{d/2}}{\Gamma\left(d/2+1\right)2^d}
+\end{displaymath}
+
+\newslide
+
+<<c0>>=
+rvball <- local({
+  pi <- base::pi  ## make sure it is the right one
+
+  function(d)
+  structure(exp(d/2 * log(pi) - d * log(2) - lgamma(d/2 + 1)),
+            names = as.character(d))
+})
+floor(1/rvball(1:10))
+@
+
+\newslide
+
+\subsection{A simulation strategy}
+\label{sec:simstrat}
+
+\begin{itemize}
+\item Generate samples uniformly within the box centred at $(0,0,\ldots,0)$
+\item Count the number at a Euclidean distance no further than 1 from
+  the origin.
+\item Take ratio.
+\end{itemize}
+
+\newslide
+
+
+<<c1>>=
+mcrvball <- function(d, N = 100000, blocksize = 10000) {
+  n2 <- inside <- 0
+  while(n2 < N) {
+    n1 <- n2
+    n2 <- min(n2 + blocksize, N)
+    No <- n2 - n1
+    samp <- matrix(runif(No * d, -1, 1), No, d)
+    inside <- inside + sum(rowSums(samp^2) < 1)
+  }
+  res <- list(dimensions = d, inside = inside,
+              total = N, call = match.call())
+  class(res) <- "mcrvball"
+  res
+}
+@
+
+\newslide
+
+An alternative implementation using the \rfile{doParallel} family of packages.
+<<c1a>>=
+mcrvball2 <- function(d, N = 100000, blocksize = 10000) {
+  chunks <- idiv(N, chunkSize = blocksize) ## division iterator
+  inside <- foreach(No = chunks, .combine = sum) %dopar% {
+    samp <- matrix(runif(No*d, -1, 1), No, d)
+    sum(rowSums(samp^2) < 1)
+  }
+  structure(list(dimensions = d, inside = inside,
+                 total = N, call = match.call()),
+            class = "mcrvball")
+}
+@
+To use it:
+<<>>=
+suppressPackageStartupMessages(library(doParallel))
+cl <- makePSOCKcluster(detectCores() - 1)
+registerDoParallel(cl)              ## not needed in "parallel" package
+
+tst <- mcrvball2(10, N = 1e7, blocksize = 1e5)
+
+stopCluster(cl)
+rm(cl)
+@
+
+\newslide
+
+\subsection{S3 methods}
+\label{sec:methods}
+
+<<c2>>=
+print.mcrvball <- function(x, ...) {
+  with(x, cat("Dim.:", dimensions,
+              "Estimated:", signif(inside/total, 4),
+              "Actual:", signif(rvball(dimensions), 4), "\n"))
+  invisible(x)
+}
+
+Ops.mcrvball <- function(e1, e2) {  ## group generic
+  if(inherits(e1, "mcrvball"))
+  e1 <- with(e1, inside/total)
+
+  if(!missing(e2) && inherits(e2, "mcrvball"))
+  e2 <- with(e2, inside/total)
+  NextMethod()
+}
+@
+
+\newslide
+
+<<c3>>=
+for(i in 4:10) print(mcrvball(i, 1000000))
+@
+
+<<c4>>=
+r <- numeric(7)
+for(d in 4:10) r[d-3] <- floor(1/mcrvball(d)) ; r
+@
+
+\newslide
+Having a \rcode{call} component allows \rcode{update} to be used:
+<<c4a>>=
+p10 <- mcrvball(10)
+p10a <- update(p10, N = 1000000, blocksize = 100000)
+c(1/p10, 1/p10a)
+"%+%" <- function(e1, e2)
+    UseMethod("%+%")
+"%+%.mcrvball" <- function(e1, e2) {
+    if(e1$dimensions != e2$dimensions) stop("ball dimensions differ!")
+    res <- list(dimensions = e1$dimensions, inside = e1$inside + e2$inside,
+                total = e1$total + e2$total, call = e1$call)
+    class(res) <- "mcrvball"
+    res
+}
+# p10 %+% p10a
+floor(1/(p10 %+% p10a))
+@
+\newslide
+Automatic (lazy) vectorization
+<<>>=
+Mcrvball <- Vectorize(mcrvball, vectorize.args = c("d", "N"), SIMPLIFY = FALSE)
+Mcrvball(4:8, N = 1e6, blocksize = 1e5)
+@
+
+\newslide
+\subsection{Some lessons}
+\label{sec:lessons}
+\begin{itemize}
+\item
+Vectorization. (\rcode{rvball}) and vectorization tools: (\rcode{Vectorize}) 
+\item Taking the ``whole object view'' of the
+  problem. (\rcode{mcrvball})
+\item Object orientation: put all the information you are likely to
+  need into the object and give it a class. (\rcode{mcrvball})
+\item Methods for existing generics. (\rcode{print.mcrvball})
+\item Group generic functions. (\rcode{Ops.mcrvball})
+\item Binary operators and new generic functions. (\verb|%+%|)
+\end{itemize}
+
+\newslide
+
+\section{Intermission: On text processing}
+\label{sec:text}
+
+Data in the form of text is becoming more common and important.
+
+\R has many sophisticated tools and packages for text
+manipulation---here we just glimpse two elementary ones: \rcode{grep}
+and \rcode{(g)sub}: the first for finding, the second twin pair for
+fixing.
+
+\subsection{The Authorised Version of King James}
+\label{sec:james}
+
+The \rfile{extdata} subdirectory of the \rfile{WWRCourse} package folder
+contains two compressed text files, of
+the first and last books of AV:
+<<tp1>>=
+subdir <- system.file("extdata", package = "WWRCourse")
+dir(subdir, pattern = "\\.txt.gz$")    ## NB regular expression
+@
+Our task is to compare \emph{chapter length} \emph{phrase length} and \emph{word length} in
+these two document, as an aspect of literary style
+\newslide
+
+\subsection{Reading in}
+\label{sec:gzin}
+
+<<tp2>>=
+gen <- file.path(subdir, "Genesis.txt.gz")
+rev <- file.path(subdir, "Revelations.txt.gz")
+Genesis <- scan(gzfile(gen), what = "")  ## no need to gunzip()
+Revelations <- scan(gzfile(rev), what = "")
+rbind(head(Genesis), head(Revelations)) %>% noquote
+@
+
+Both have chapter markers in them of the form \texttt{Gen.1},
+\texttt{Rev.23},  which are not part of the text.  We can get the
+chapter lengths from them, though.
+<<tp3>>=
+grep("^Gen\\.[[:digit:]]+$", Genesis)[1:5] ## the idea
+chapterLengths <- function(txt,   ## cement it in a function & check
+            book = substring(deparse(substitute(txt)), 1, 3)) {
+  regex <- paste0("^", book, "\\.[[:digit:]]+$")
+  where <- grep(regex, txt)
+  diff(where - seq_along(where))
+}
+GenC <- chapterLengths(Genesis)
+RevC <- chapterLengths(Revelations)
+rbind(Gen = c(n = length(GenC), median = median(GenC)),
+      Rev = c(n = length(RevC), median = median(RevC)))
+@
+Revelations has fewer, and shorter chapters, but the chapter lengths are
+quite similar to the opening chapter lengths of Genesis:
+<<tp4,out.height="0.9\\textheight",fig.width=10,fig.height=7>>=
+plot(GenC, type="h", col = "#418A78", xlab = "Chapter #",
+     ylab="Words", ylim = range(0, GenC, RevC))
+points(RevC, pch=20, col="#FC7115", cex=1.5)
+legend("topright", c("Genesis", "Revelations"), lty = c("solid", NA),
+       pch=c(NA, 20), col = c("#418A78", "#FC7115"), bty="n")
+@
+\newslide
+A (contrived) \rcode{ggplot} version
+<<line_270_,fig.height=7,fig.width=11>>=
+gendat <- data.frame(x = c(1, rep(seq_along(GenC), each = 3)),
+                     y = c(0, rbind(0, GenC, 0)))
+revdat <- data.frame(x = seq_along(RevC), y = RevC)
+ggplot() + aes(x,y) + geom_path(data = gendat, colour = "#418A78") +
+  geom_point(data = revdat, colour = "#FC7115", size = 2) +
+  geom_hline(yintercept = 0, colour = "grey", size = 0.5) +
+  labs(x = "Chapter #", y = "Words") +
+  annotate("text", x = 50, y = 1800, label = "Genesis",
+           colour = "#418A78", hjust = 1) +
+  annotate("text", x = 50, y = 1750, label = "Revelations",
+           colour = "#FC7115", hjust = 1) + theme_bw()
+@
+
+\newslide
+\subsection{Phrase length}
+\label{sec:ph}
+The first step is to strip out the chapter markers and leave the words,
+and punctuation, only.
+<<tp5>>=
+Gen <- grep("^Gen\\.[[:digit:]]+$", Genesis, invert = TRUE, value = TRUE)
+Rev <- grep("^Rev\\.[[:digit:]]+$", Revelations, invert = TRUE, value = TRUE)
+noquote(rbind(head(Gen), head(Rev)))
+@
+We define a phrase as the words between successive (terminal)
+punctuation marks.  These indicate a pause in the reading.
+<<tp6>>=
+GenP <- diff(c(0, grep("[[:punct:]]$", Gen)))
+RevP <- diff(c(0, grep("[[:punct:]]$", Rev)))
+rbind(Gen = head(GenP), Rev = head(RevP))
+@
+Put into a data frame and look at the relative
+frequencies.\footnote{Exercise: Assuming Length-1 is Poisson, test for
+  a difference in mean phrase length between the two books}
+
+<<tp7,out.lines=8,fig.show="hold">>=
+Phrase <- rbind(data.frame(Book = "Gen", Length = GenP),
+                data.frame(Book = "Rev", Length = RevP))
+tab <- with(Phrase, table(Book, Length)); t(tab)
+colours <- c(Genesis = "#418A78", Revelations = "#FC7115")
+par(cex.axis = 0.8)
+barplot(tab/rowSums(tab), beside = TRUE, main = "Phrase Length",
+        fill = colours, colour = colours)
+grid()
+@
+Finally we come to word length distributions.  For this we strip out
+any non-letter character and count the string lengths of what is left.
+<<tp8,out.lines=4,fig.show="hold">>=
+GenW <- nchar(gsub("[^[:alpha:]]", "", Gen))
+RevW <- nchar(gsub("[^[:alpha:]]", "", Rev))
+noquote(rbind(head(Rev), head(RevW)))  ## word 5 comma excluded
+Words <- rbind(data.frame(Book = "Gen", Length = GenW),
+               data.frame(Book = "Rev", Length = RevW))
+tab <- with(Words, table(Book, Length)); t(tab)
+par(cex.axis = 0.8)
+barplot(tab/rowSums(tab), beside = TRUE, main = "Word Length",
+        fill = colours, colour = colours)
+grid()
+@
+
+\newslide
+\section{Convolutions}
+\label{sec:conv}
+
+Given two sequences of numbers, $a_i, i = 0,1,\ldots$ and $b_j,
+j=0,1,\ldots$ their \emph{convolution} is defined by
+\begin{displaymath}
+  (ab)_k = \sum_{i+j=k}a_ib_j
+\end{displaymath}
+(this is the operation involved in polynomial multiplication).
+
+Consider some methods for doing this in \R.
+
+\newslide
+<<c7>>=
+convolve0 <- function(a, b) {
+  ab <- rep(0, length(a) + length(b) - 1)
+  for(i in 1:length(a))
+    for(j in 1:length(b))
+      ab[i+j-1] <- ab[i+j-1] + a[i]*b[j]
+  ab
+}
+###
+convolve1 <- function(a, b) {
+  ab <- rep(0, length(a) + length(b) - 1)
+  ind <- 1:length(a)
+  for(j in 1:length(b)) {
+    ab[ind] <- ab[ind] + a*b[j]
+    ind <- ind + 1
+  }
+  ab
+}
+@
+
+
+\newslide
+
+
+<<c8>>=
+convolve1a <- function(a, b) {
+  if(length(a) < length(b)) Recall(b,a) else {
+    ab <- rep(0, length(a) + length(b) - 1)
+    ind <- 1:length(a)
+    for(j in 1:length(b)) {
+      ab[ind] <- ab[ind] + a*b[j]
+      ind <- ind + 1
+    }
+    ab
+  }
+}
+###
+convolve2 <- function(a, b) {
+  p <- outer(a, b)
+  as.vector(tapply(p, row(p) + col(p), sum))
+}
+### Uses much less memory than convolve2
+convolve2a <- function(a, b)
+  as.vector(tapply(outer(a, b),
+            outer(seq(along = a), seq(along = b), "+"), sum))
+@
+\newslide
+The young geek's version.
+
+<<hw>>=
+convolve_hw <- function(a, b) {
+  stopifnot(require(dplyr))
+  data.frame(x = as.vector(outer(a, b)),
+             g = as.vector(outer(seq_along(a),
+                                 seq_along(b), "+"))) %>%
+    group_by(g) %>%
+    summarise(conv = sum(x), .groups = 'drop') %>%
+    .[["conv"]]
+}
+@
+\newslide
+
+\subsubsection*{A C code version}
+\label{ccode}
+
+File \verb|VR_convolve.c| has the code:
+\begin{small}
+\begin{verbatim}
+void VR_convolve(double *a, int *na,
+                  double *b, int *nb,
+                  double *ab)
+{
+  int i, j, nab = *na + *nb - 1;
+
+  for(i = 0; i < nab; i++) ab[i] = 0.0;
+  for(i = 0; i < *na; i++)
+    for(j = 0; j < *nb; j++)
+      ab[i + j] += a[i] * b[j];
+}
+\end{verbatim}
+
+\end{small}
+
+To compile:
+\begin{small}
+\begin{verbatim}
+$ R CMD SHLIB VR_convolve.c
+\end{verbatim}
+\end{small}
+
+
+\newslide
+<<c9>>=
+convolve3 <- function(a, b) {
+  if(!is.loaded("VR_convolve")) {
+    path <- file.path("SharedObjects",
+                      paste("VR_convolve",
+                            .Platform$dynlib.ext, sep=""))
+    dyn.load(path)
+  }
+  storage.mode(a) <- "double"
+  storage.mode(b) <- "double"
+
+  .C("VR_convolve",
+     a,
+     length(a),
+     b, length(b),
+     ab = double(length(a) + length(b) - 1))$ab
+}
+@
+\newslide
+
+\subsubsection*{The \rfile{Rcpp} revolution}
+\label{sec:Rcpp}
+
+\begin{itemize}
+\item Makes it easy to write compiled code \emph{without} the need
+  for an \R-side interface function (such as the above).
+\item Can interact directly with \R-objects, using \R to make
+  \emph{most} of the mode conversions
+\item Good tools for creating packages using such code,
+  (\rcode{Rcpp.package.skeleton}, in particular).
+\item Drawbacks:
+  \begin{itemize}
+  \item The code has to be written specifically for \rfile{Rcpp},
+    using the extensive \Cpp header files,
+  \item There \emph{can be} a small performance overhead using
+    ``\rfile{RcppSugar}'', (but quicker programming and fewer
+    bugs).
+  \end{itemize}
+  Use \rfile{Rcpp} to extend the \R system;  Use
+  the \rcode{dyn.load} to use of existing code, or minimally modified.
+
+\end{itemize}
+\newslide
+An \rfile{Rcpp} convolution function: file \texttt{src/convolve3a.Cpp}
+<<conv3a,engine="Rcpp",include=FALSE>>=
+#include <Rcpp.h>
+using namespace Rcpp;
+
+// [[Rcpp::export]]
+NumericVector convolve3a(NumericVector x, NumericVector y)
+{
+    int nx = x.size(), ny = y.size(), nz = nx + ny - 1;
+    NumericVector z(nz);  // set to 0 on creation. NB z() not z[] here!
+
+    for(int i = 0; i < nx; ++i) {
+        for(int j = 0; j < ny; ++j) {
+            z[i+j] += x[i]*y[j];
+        }
+    }
+    return z;
+}
+@
+<<showit,eval=FALSE>>=
+<<conv3a>>
+@
+\newslide
+To make the code available as an \R function, you need to have the
+necessary tools installed, but then:
+<<c3make,eval=FALSE>>=
+library(Rcpp)
+sourceCpp("src/convolve3a.cpp")
+@
+<<line_508_,include=FALSE>>=
+library(Rcpp)
+@
+The \R version of the function looks like:
+<<line_512_>>=
+convolve3a
+@
+\newslide
+Alterntively, small functions can be compiled directly as a text string. The headers are assumed:
+<<>>=
+Rcpp::cppFunction('
+NumericVector convolve3a(NumericVector x, NumericVector y)
+{
+    int nx = x.size(), ny = y.size(), nz = nx + ny - 1;
+    NumericVector z(nz);  // set to 0 on creation. NB z() not z[] here!
+    for(int i = 0; i < nx; ++i) {
+        for(int j = 0; j < ny; ++j) {
+          z[i+j] += x[i]*y[j];
+        }
+    }
+    return z;
+}
+')
+@
+\newslide
+
+Such functions \emph{must} be re-made the first time they are needed
+in an \R session, in order to integrate them with the \R program.
+They cannot be \rcode{save()}d in one session and \rcode{load()}ed in
+another, for example.
+
+Permanent versions \emph{can} be made in packages, however, with the
+system integration automatically happening when the package is loaded.
+
+\newslide
+Some checks:
+<<c10>>=
+a <- 1:3; b <- 4:7
+rbind(convolve0(a,b), convolve1(a,b), convolve1a(a,b),
+      convolve2(a,b), convolve2a(a,b), convolve3(a,b),
+      convolve3a(a,b), convolve_hw(a, b))
+@
+\newslide
+<<c10a,out.height="2.5in",fig.width=7,fig.height=5>>=
+library(microbenchmark)
+a <- 1:300; b <- 4:7
+(b <- microbenchmark(convolve_hw(a, b),
+                     convolve0(a,b),
+                     convolve1(a,b),
+                     convolve1a(a,b),
+                     convolve2(a,b),
+                     convolve2a(a,b),
+                     convolve3(a,b),
+                     convolve3a(a,b))) %>% summary() %>% arrange(median) %>%
+                                .[, cs(expr, min, median, mean, max, cld)]
+suppressMessages(autoplot(b)) + theme_economist()
+@
+
+\newslide
+
+Some timings (the old fashioned way):
+<<c11,cache=TRUE>>=
+a <- 1:1000; b <- 1:10000
+library(rbenchmark)
+benchmark(convolve0 (a,b), convolve1 (a,b), convolve1 (b,a),
+          convolve1a(a,b), convolve1a(b,a), convolve2 (a,b),
+          convolve2a(a,b), convolve3 (a,b), convolve3a(a,b),
+          columns = c("test", "replications", "elapsed", "relative"),
+          order = "relative", relative = "elapsed")
+@
+
+\newslide
+\phantomsection
+\addcontentsline{toc}{section}{Session information}
+\section*{Session information}
+\label{sec:sessinfo}
+\vspace{-10pt}
+\begin{tiny}
+<<sessionInfo,echo=FALSE,results="asis",out.lines=200>>=
+cat("{\\bf\nDate: ", format(today()), "\n}")
+toLatex(sessionInfo(), locale = FALSE)
+@
+\end{tiny}
+
+
+\end{slide}
+
+\end{document}
+

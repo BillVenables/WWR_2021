@@ -1,0 +1,736 @@
+\documentclass{seminar}
+\usepackage[utf8]{inputenc}
+
+\usepackage{RlogoNew}
+\usepackage{Rcolors}
+
+\usepackage{tabularx}
+\usepackage{SeminarExtra}
+\usepackage{op}
+
+\renewcommand{\hlcom}[1]{\textcolor[rgb]{0.625,0.125,0.9375}{\textsl{#1}}}%
+\renewcommand{\code}[1]{\textsl{\texttt{#1}}}
+\newcommand{\spreadout}{$\vphantom{\big\{}$\xspace}
+
+\DeclareGraphicsExtensions{.pdf,.png,.jpg,.JPG}
+\graphicspath{{Fig/}}
+
+<<"prelim",child="00-Prelim.Rnw">>=
+@
+
+<<setFigPath,include=FALSE>>=
+.infile <- sub("\\.Rnw$", "", knitr::current_input())
+knitr::opts_chunk$set(fig.path = paste0('Fig/', .infile, "_")) #$
+session <- sub("^0+", "", sub("[^[:digit:][:alpha:]].*$", "", .infile))
+@
+
+\usepackage{natbib}
+\bibliographystyle{chicago}
+
+\title{\Large \input{title.tex}
+  \Huge \red{Session \Sexpr{session}:\\[10pt]
+    Random Effects Extensions}}  %%% Change needed
+
+\input{authorAndDate}
+
+\begin{document}
+\setkeys{Gin}{keepaspectratio=TRUE}
+
+\begin{slide}
+\slidepagestyle{empty}
+
+  {\color{darkgreen}\maketitle}
+\end{slide}
+
+\begin{slide}
+\slidepagestyle{plain}
+\setcounter{slide}{1}
+
+\begin{footnotesize}
+\tableofcontents
+\end{footnotesize}
+
+
+\newslide
+
+\section{An introductory example: petroleum extraction}
+\label{sec:an-intr-exampl}
+
+The petrol data of N. L. Prater.
+\begin{itemize}
+\item \rcode{No} crude oil sample identification label. (Factor.)
+\item \rcode{SG} specific gravity, degrees API.  (Constant within
+  sample.)
+\item \rcode{VP} vapour pressure in pounds per square inch. (Constant
+  within sample.)
+\item \rcode{V10} volatility of crude; ASTM 10\% point. (Constant
+  within sample.)
+\item \rcode{EP} desired volatility of gasoline. (The end point.
+  Varies within sample.)
+\item \rcode{Y} yield as a percentage of crude.
+\end{itemize}
+\newslide
+For a description in \R:
+<<line_074_,eval=FALSE>>=
+?petrol
+petrol  ## print the whole data!
+@
+
+<<line_079_,out.lines=10,echo=FALSE>>=
+petrol
+@
+
+For a more complete description of the data and an alternative
+(somewhat fussy) analysis see the \rfile{betareg} package,
+\citep{cribari-neto10:_beta_regres_r}.  \rcode{?GasolineYield}.
+\newslide
+An initial look at the data:
+<<c0a,eval=FALSE>>=
+ggplot(petrol) + aes(x = EP, y=Y) +
+  geom_point(colour = "red") +
+  stat_smooth(method = "lm", se = FALSE, fullrange = TRUE,
+              size=0.5, colour = "blue",formula=y~x) + facet_wrap( ~ No) +
+  labs(title = "Petrol refining data of N. L. Prater",
+       x = "Refining end poing (EP)",
+       y = "Petroleum yield as a % of crude, (Y)")
+@
+The plots are shown below
+It will be convenient later to have a centred version of \rcode{EP}:
+<<c0b>>=
+petrol <- petrol %>%
+  within(EPc <- scale(EP))  ### for convenience
+Store(petrol)
+@
+\newslide
+<<c0show,echo=FALSE,fig.height=7,fig.width=9>>=
+<<c0a>>
+@
+\newslide
+\subsection{Fixed or random?}
+\label{sec:fixed-or-random}
+
+A pure fixed effects model treats the crude oil samples as independent
+with the residual error as the only source of randomness.
+
+A random effects model treats them as possibly dependent, in that they
+may share the value of a latent random variable, addition to the
+residual error.
+
+The obvious candidate predictor to be regarded as injecting an
+additional source of randomness is the crude oil sample indicator, \rcode{No}.
+\newslide
+Fixed effects only.
+<<c1>>=
+options(show.signif.stars = FALSE)
+m3 <- lm(Y ~ 0 + No/EPc, petrol)            ## 10 ints + 10 slopes
+m2 <- lm(Y ~ 0 + No+EPc, petrol)            ## 10 ints + 1 slope
+m1 <- lm(Y ~ 1 + SG+VP+V10+EPc, petrol)     ## (1 int + 3 coeffs) + 1 slope
+anova(m1, m2, m3)
+@
+Parallel regressions, but differences between samples cannot quite be
+explained by regression on the other variables.
+
+\newslide
+
+<<line_135_,echo=FALSE>>=
+requireData(SOAR)
+Attach()
+@
+
+Random effects alternatives:
+<<c2>>=
+requireData(lme4)     ## alt. nlme
+Rm1 <- lmer(Y ~ 1 + SG+VP+V10 + EPc + (1|No),     data = petrol)
+Rm2 <- lmer(Y ~ 1 + SG+VP+V10 + EPc + (1+EPc|No), data = petrol)
+anova(Rm1, Rm2)       ## automatic re-fitting
+@
+Emphatically different slopes are not needed!
+\newslide
+NB:
+\begin{itemize}
+\item Default fitting method ``\textsl{REML}'' produces good estimates of
+  variance components
+\item To compare models using LR, models must be fitted with method ``\textsl{ML}''
+\item \rcode{anova} detects if this has happened and updates the object if necessary.
+\end{itemize}
+
+
+\newslide
+
+Inspecting the random effects fit:
+
+<<c3>>=
+print(summary(Rm1), correlation = FALSE)
+@
+
+
+\newslide
+
+<<c3a>>=
+print(summary(Rm2), correlation = FALSE)
+@
+
+Use \rcode{fixef} for fixed effect estimates and \rcode{ranef} for BLUPs:
+<<c4>>=
+cbind(Rm1 = ranef(Rm1)$No, Rm2 = ranef(Rm2)$No)
+@
+
+\newslide
+
+Variances and correlations
+
+<<c5>>=
+VarCorr(Rm2)          ## an unhelpful print method.
+names(VarCorr(Rm2)) %>% noquote()
+VarCorr(Rm2)[["No"]]  ## The pieces are all accessible
+@
+
+
+
+\newslide
+
+\section{An extended example: going fishing}
+\label{sec:an-extended-example}
+
+The \rfile{Headrope} data set gives catch and effort data from a prawn
+fishery.
+
+\begin{itemize}
+\item The fishery has 7 \rcode{Stock} regions \rcode{Tig1}, \dots,
+  \rcode{Tig7}, West to East.
+\item The data is for 20 seasons (\rcode{YearF}) 1987, \dots,
+  2006.  (\rcode{Y2K} = year - 2000.)
+\item There are 236 \rcode{Vessel}s, which visit one or more stock
+  regions within a season, each for one or more \rcode{Days}.
+\item The \emph{response} for which a model is required is the total
+  \rcode{Catch} in kg, by a vessel within a stock region for a season.
+\item Additionally the vessels have \rcode{Hull} size, engine
+  \rcode{Power} and the \rcode{Head}rope length they were using
+  recorded.  (These are constant within season, but may change between
+  seasons.)
+\end{itemize}
+
+\newslide
+
+<<c6>>=
+dim(Headrope)
+head(Headrope, 2)
+Headrope <- Headrope %>% within(YearF <- factor(YearF)) ## needed
+Store(Headrope)
+@
+
+The purpose of the study was to gain some insight on the marginal
+effect of headrope length on the catch.
+
+A multiplicative (log-linear) model was suggested, with additive
+random effects for a) vessel and b) stock regions over seasons.
+
+Two random effects models: the first is the simpler
+
+<<c7,cache=FALSE>>=
+HRmodel1 <- lmer(log(Catch) ~ 0 + log(Days) + Y2K + log(Head) +
+                 log(Power) + log(Hull) + Stock +
+                 (1|Vessel) + (1|YearF/Stock), data = Headrope,
+                 control = lmerControl(optimizer = "bobyqa"))
+HRmodel1_ML <- update(HRmodel1, REML = FALSE)
+Store(HRmodel1, HRmodel1_ML, lib = .Robjects)
+@
+
+The second has a more elaborate random effect structure:
+
+<<c8,cache=TRUE>>=
+HRmodel2 <- lmer(log(Catch) ~ 0 + log(Days) + Y2K + log(Head) +
+                 log(Power) + log(Hull) + Stock +
+                 (1|Vessel) + (0+Stock|YearF), data = Headrope,
+                 control = lmerControl(optimizer = "bobyqa"))
+HRmodel2_ML <- update(HRmodel2, REML = FALSE)
+Store(HRmodel2, HRmodel2_ML, lib = .Robjects)
+@
+<<include=FALSE>>=
+  if("package:MASS" %in% search()) detach("package:MASS")
+@
+
+
+\newslide
+The more elaborate model seems justified by AIC, but not BIC!
+<<c10>>=
+anova(HRmodel1_ML, HRmodel2_ML)
+@
+
+
+\newslide
+The fixed effects estimates are very similar:
+<<c9>>=
+cbind(m1 = fixef(HRmodel1), m2 = fixef(HRmodel2))
+@
+\newslide
+Some notes:
+\begin{itemize}
+\item The coefficient on \rcode{log(Days)} is slightly larger than 1,
+  (but significantly).  A coefficient of 1 would imply that,
+  \emph{mutatis mutandis}, catch is proportional to ``effort''
+  (measured in boat days).
+\item The coefficient of \rcode{Y2K} suggests an average fishing power
+  increase in the order of 2.5\%-3.5\% per year.  This looks about
+  right, but it is confounded with change in the stock abundance.
+  Essentially the job of disentangling this confounding is what stock
+  assessment is all about (and why it is so hard).
+\end{itemize}
+
+For reference we include a copy of the summary of the more elaborate
+model below.
+
+\newslide
+<<c10a>>=
+print(summary(HRmodel2), correlation = FALSE)
+@
+\newslide
+
+\subsection{A brief look at generalized linear/additive mixed models}
+\label{sec:brief-look-at}
+
+Software for GLMMs is still somewhat developmental.
+\begin{itemize}
+\item \rcode{glmmPQL} in \rfile{MASS} is based on \rfile{nlme}, but
+  handles general cases.
+\item \rcode{glmer} from the \rfile{lme4} package handles some GLMMs
+  but is restricted in the families it can take.  (In particular,
+  \rcode{quasipoisson} is NOT included.)
+\end{itemize}
+
+The software for GAMMs also uses a linear ME engine.
+\begin{itemize}
+\item \rcode{gamm} from the \rfile{mgcv} package uses \rfile{nlme}
+  engine,
+\item \rcode{gamm4} from he \rfile{gamm4} package \citep{wood11},
+  uses \rfile{lme4} engine, (and so has the same limitations).
+\end{itemize}
+
+Both \rcode{gamm} and \rcode{gamm4} return a composite object with an
+\texttt{lme} and a \texttt{gam} component.  Manipulation is tricky.
+
+\newslide
+
+To illustrate, we construct a GLMM and a GAMM for the Tiger Prawn
+species split example.  The model structure is slightly simplified
+relative to the working model.
+
+We use two helper functions, \rcode{Hyear} and \rcode{twoWay} which
+will be defined at the end.
+
+\newslide
+<<help,echo=FALSE>>=
+Harm <- function (theta, k = 4) {
+  X <- matrix(0, length(theta), 2 * k)
+  nam <- as.vector(outer(c("c", "s"), 1:k, paste, sep = ""))
+  dimnames(X) <- list(names(theta), nam)
+  m <- 0
+  for (j in 1:k) {
+    X[, (m <- m + 1)] <- cos(j * theta)
+    X[, (m <- m + 1)] <- sin(j * theta)
+  }
+  X
+}
+Hyear <- function(x, k = 4)
+    Harm(2*base::pi*x/365.25, k)
+twoWay <- local({
+  `%star%` <- function(X, Y) { ## all column-products
+    X <- as.matrix(X)
+    Y <- as.matrix(Y)
+    stopifnot(is.numeric(X), is.numeric(Y),
+              nrow(X) == nrow(Y))
+    XY <- matrix(NA, nrow(X), ncol(X)*ncol(Y))
+    k <- 0
+    for(i in 1:ncol(X))
+        for(j in 1:ncol(Y)) {
+          k <- k+1
+          XY[, k] <- X[, i] * Y[, j]
+        }
+    XY
+  }
+  function(day, sea, k = c(3,2)) {
+    Hyear(day, k[1]) %star% splines::ns(sea, k[2])
+  }
+})
+Store(Harm, Hyear, twoWay, lib = .Robjects)
+@
+First, the GLMM:
+<<g1,cache=TRUE>>=
+TModelGLMM <- glmmPQL(Psem/Total ~ ns(Coast, 6) + ns(Sea, 5) +
+                      twoWay(DayOfYear, Sea) + ns(Depth, k=5) +
+                      Hyear(DayOfYear, 2) + ns(Mud, k=5),
+                      random = ~1|Survey,
+                      family = quasibinomial, data= Tigers,
+                      niter = 40, weights = Total)
+Store(TModelGLMM, lib = .Robjects)
+@
+%% <<g1real,echo=FALSE>>=
+%% if(!exists("TModelGLMM")) {
+%% <<g1>>
+%% }
+%% @
+<<include=FALSE>>=
+  if("package:MASS" %in% search()) detach("package:MASS")
+@
+
+Note that the random component is defined separately from the main
+formula, in \rfile{nlme} style.
+
+\newslide
+
+For a GAM with smoothed terms:
+<<g2,cache=TRUE>>=
+requireData(mgcv)
+TModelGAMM <- gamm(formula = Psem/Total ~ s(Coast, k=5) + s(Sea,k=5) +
+                   twoWay(DayOfYear, Sea) +
+                   s(DayOfYear, k=5, bs="cc") + s(Depth,k=5) +
+                   s(Mud, k=5),
+                   knots = list(DayOfYear = seq(0, 364.25, length = 5)),
+                   random = list(Survey = ~1),
+                   family = quasibinomial, data = Tigers,
+                   niterPQL = 40,
+                   weights = Total)
+Store(TModelGAMM, lib = .Robjects)
+@
+%% <<g2real,echo=FALSE>>=
+%% if(!exists("TModelGAMM")) {
+%% <<g2>>
+%% }
+%% @
+<<include=FALSE>>=
+  if("package:MASS" %in% search()) detach("package:MASS")
+@
+
+The random effects from these different models are quite similar.  We
+illustrate below.
+
+\newslide
+
+<<g3>>=
+re1 <- ranef(TModelGLMM)
+re2 <- ranef(TModelGAMM$lme)$Survey  ## obscure
+re12 <- cbind(re1, re2)
+names(re12) <- c("GLMM", "GAMM")
+re12
+@
+
+\newslide
+Displaying the correspondence ``by hand'' with base graphics and plot
+tricks.
+<<g4>>=
+layout(rbind(1:2), widths = c(3.5,0.5), heights = c(3.5, 3.5),
+       respect = TRUE)
+with(re12, {
+  nos <- seq_along(GLMM)
+  lim <- range(GLMM, GAMM)
+  plot(GLMM ~ GAMM, pch = 20, col="red", bty="n",
+       xlim = lim, ylim = lim, asp = 1)
+  abline(0, 1, col = "grey", lty = "dashed")
+  box(col = "grey")
+  grid()
+  pos <- avoid(GAMM, GLMM) ## minimise clashes
+  text(GLMM ~ GAMM, labels = nos, xpd = NA, pos=pos)
+  par(mar = c(0,0,0,0), xpd = NA)
+  frame()
+  legend("center", paste(format(nos), rownames(re12),
+                         sep = ": "), bty="n")
+})
+@
+\newslide
+But wait, there's more.
+<<g4ggplot>>=
+re12 <- re12 %>% within({
+  Survey <- factor(rownames(re1)) %>% reorder(-(GLMM+GAMM), I)
+})
+ggplot(re12) + aes(x = GAMM, y = GLMM) +
+    coord_equal() + xlim(-1.5, 1.2) + ylim(-1.5, 1.2) +
+    geom_abline(intercept = 0, slope = 1,
+                linetype = "dashed", colour = "grey") +
+    geom_point(colour = "red")  +
+    ggrepel::geom_label_repel(aes(label = Survey),
+                              fill = alpha("sky blue", 0.5)) +
+    labs(x = "Generalises Additive Mixed Model",
+         y = "Generlaised Linear Mixed Model") +
+    theme_bw() +
+    theme(text = element_text(family = "sans"))
+@
+\newslide
+% A recent addition to the \R packages: \rcode{ggrepel}
+%
+% <<repel>>=
+% requireData(ggrepel)
+% theme_set(theme_solarized()) ## bog standard
+% gg <- ggplot(re12) + aes(x = GAMM, y = GLMM) +
+%   coord_equal() + xlim(-1.5, 1.35) + ylim(-1.5, 1.35) +
+%   geom_abline(intercept = 0, slope = 1,
+%               linetype = "dashed", colour = "grey") +
+%   geom_point(color = "red", shape = 20, size = 3)  +
+%   theme(text = element_text(family = "sans"))
+% gg + geom_text_repel(aes(label = Survey), colour = "dark green")
+%
+% gg + geom_label_repel(aes(label = Survey), fill = "steel blue",
+%                       colour = "white")
+% @
+\newslide
+\section{Count response variables}
+
+Three most important models for frequency responses are
+\begin{description}
+\item[Binomial:] variance less than the mean,
+
+$\mbox{V}[Y] = \mu(1-\mu/n)$.
+\item[Poisson:] variance equal to the mean,
+
+$\mbox{V}[Y] = \mu$.
+\item[Negative Binomial:] variance greater than the mean,
+
+$\mbox{V}[Y] = \mu(1+\mu/\theta)$.
+\end{description}
+
+It is clear when a Binomial model is appropriate.
+
+Poisson models are mostly used in \emph{surrogate} models for
+multinomial situations.
+
+\subsection{Negative Binomial models: the \texttt{quine} example}
+
+Negative Binomial models have proved to be a good option
+for situations where the response is a count variable
+and the variance is clearly larger than the mean, but the
+standard deviation is \emph{roughly proportional} to the mean.
+
+This behaviour often results when the count comes from a process
+where there are clumps or clusters in the items being counted.
+
+\subsubsection*{The \texttt{quine} data}
+
+\begin{itemize}
+  \item Response: \texttt{Days} away from school by a student in one school year.
+  \item Predictors: Four classifying factors, \texttt{Age}, \texttt{Lrn},
+  \texttt{Sex} and \texttt{Eth}.
+\end{itemize}
+
+\newslide
+
+The first clue that this is \emph{not} well modelled as a Poisson response
+is that the deviance far exceeds the residual degrees of freedom:
+
+<<q1>>=
+head(quine, 2)
+q0 <- glm(Days ~ Age*Sex*Eth*Lrn, poisson, quine)
+c(deviance = deviance(q0), "residual d.f." = df.residual(q0))
+@
+
+\newslide
+Now check the form of any mean-variance relationship:
+
+<<q2>>=
+quine %>%
+  group_by(Age, Sex, Eth, Lrn) %>%
+  summarise(n = n(), mu = mean(Days), sigma = sd(Days), .groups = 'drop') %>%
+  na.omit %>%
+  unclass %>%
+  data.frame -> quine_sum
+head(quine_sum, 4)
+ggplot(quine_sum) + aes(x = mu, y = sigma, size = n) +
+  geom_point(colour = "steel blue") +
+  geom_smooth(method = "lm", formula = y ~ poly(x, 2), se = FALSE, size = 0.5) +
+  geom_smooth(method = "lm", formula = y ~ x, se = FALSE, colour = "red") +
+  theme(legend.position = "none")
+@
+
+\subsubsection*{Modelling}
+<<echo=FALSE>>=
+if("package:MASS" %in% search()) detach("package:MASS")
+@
+
+Negative binomial model has heuristic and empirical support.  Let's fit one and see
+how it goes.
+\begin{center}
+<<q3,results="asis">>=
+quine_full <- glm.nb(Days ~ Age*Sex*Eth*Lrn, quine)
+quine_step <- step_BIC(quine_full) ## BIC penalty
+dropterm(quine_step) %>%  booktabs(digits = c(0,0,2,2,6))
+@
+\end{center}
+ (Ex.: check diagnostics to verify things look OK.)
+
+\newslide
+\subsection{Gladstone Bream recruitment index}
+
+Data from a monitoring survey of bream recruitment in the Gladstone harbour region.
+\begin{itemize}
+  \item Four monthly surveys of 26 Sites, December -- March
+  \item 20 casts per visit.  Response: total bream recruits per visit
+  \item Every site monitored in 2015-16 \& 2016-17.  Some sporadic visits from 2011-12.
+  \item Some environmental variables recorded, but very roughly.
+  \item Aim: an annual site index for the GHHP health card for each Site.
+\end{itemize}
+
+<<glad1>>=
+Bream <- subset(GladstoneBream, select = c(Trip, Site:Rock, Casts, Bream))
+names(Bream) %>% noquote
+@
+\newslide
+\subsubsection*{Models}
+
+Some experience has led to a set of useful fixed effects and the needs of the index
+specify a random effect structure.  First estimate the NB model including $\theta$.
+
+<<glad2>>=
+NB_Bream0 <- glmer.nb(Bream ~ offset(log(Casts)) + Depth + Rock + Month +
+                        (1|Site) + (1|Year/Site), data = Bream, nAGQ = 0)
+getME(NB_Bream0, "glmer.nb.theta")
+@
+
+There are some advantages in fixing $\theta$ at some reasonable value
+and estimating the parameters of interest with more accuracy.
+<<glad3>>=
+NB_Bream <- glmer(Bream ~ offset(log(Casts)) + Depth + Rock + Month + (1|Site) +
+                    (1|Year/Site), family = negative.binomial(theta = 2),
+                  mustart = fitted(NB_Bream0), data = Bream, nAGQ = 1)
+@
+
+\subsubsection*{Variance components}
+Our first step is to extract the variance components.
+<<glad4>>=
+(v <- VarCorr(NB_Bream) %>% unlist ) ## these are variances!
+sigS <- sqrt(v[["Site"]])
+sigYS <- sqrt(v[["Year"]] + v[["Site:Year"]])
+c(Site = sigS, Year_x_Site = sigYS)
+@
+
+The score will be made up of the \texttt{Year} and \texttt{Site:Year}
+random effects (BLUPs), but we will produce a \texttt{Site} score
+as well, which gives some idea of the relative productivities of the
+sites themselves.
+<<glad5>>=
+(RE <- ranef(NB_Bream)) %>% names
+@
+
+\newslide
+
+<<glad6>>=
+x <- RE[["Site"]]
+(S <- data.frame(Site = factor(rownames(x), levels = rownames(x)),
+                 Score = pnorm(x[["(Intercept)"]], sd = sigS)))  %>% head(2)
+x <- RE[["Year"]]
+(Y <- data.frame(Year = factor(rownames(x), levels = rownames(x)),
+                 Y_BLUP = x[["(Intercept)"]]))                   %>% head(2)
+(x <- RE[["Site:Year"]])                                         %>% head(3)
+@
+
+This is more involved.
+
+<<glad7,results="hide">>=
+YS <- data.frame(nam = rownames(x), stringsAsFactors = FALSE) %>%
+  separate(nam, c("Site", "Year"), sep = ":") %>%
+  within({
+    Site <- factor(Site, levels = levels(S$Site))
+    Year <- factor(Year, levels = levels(Y$Year))
+    YS_BLUP <- x[["(Intercept)"]]
+  }) %>%
+  left_join(Y, by = "Year") %>%
+  within({
+    YS <- pnorm(Y_BLUP + YS_BLUP, sd = sigYS)
+    Y_BLUP <- YS_BLUP <- NULL
+  }) %>% arrange(Year) %>% 
+  pivot_wider(names_from = Year, values_from = YS) %>% 
+  arrange(Site)
+booktabs(YS)
+@
+\newslide
+\begin{center}\tiny
+<<line_630_,results="asis",echo=FALSE>>=
+booktabs(YS)
+@
+\end{center}
+\newslide
+Finally, the main result:
+<<glad8,eval=FALSE>>=
+Scores <- merge(S, YS, by = "Site") %>%
+  within({
+    Site <- factor(as.character(Site), levels = levels(Bream$Site))
+  }) %>% arrange(Site)
+Scores
+@
+
+\begin{center}\tiny
+<<glad8a,results="asis",echo=FALSE>>=
+Scores <- merge(S, YS, by = "Site") %>%
+  within({
+    Site <- factor(as.character(Site), levels = levels(Bream$Site))
+  }) %>% arrange(Site)
+Scores %>% booktabs(align = c("l", "l", rep("c", 6), "c@{}")) %>% print(include.rownames = FALSE)
+@
+\end{center}
+
+\newslide
+\subsubsection*{Notes}
+\begin{itemize}
+  \item The offset of \texttt{log(Casts)} allows for minor fluctuations
+  from the nominal 20~casts per visit and recognises that, other things
+  being equal, catch should be proportional to effort.
+  \item The \texttt{Month} fixed effect allows for systematic changes in
+  productivity over the calendar year.
+  \item The \texttt{Site} score is an estimate of the (relative) productivity
+  of the site for Bream recruitment overall, allowing for the minimal effect
+  of \texttt{Depth} and \texttt{Rock} in the fixed effects.
+  \item The \texttt{Year}~$\times$~\texttt{Site} scores give a
+  measure of the \emph{change} in catch rate from year to year \emph{relative}
+  to what might have been expected given the productivity of the site.
+  \item Converting scores to a $(0,1)$ scale is something required by
+  the Health Card protocol; this is only \emph{one possible} way to do it.
+\end{itemize}
+
+
+
+\newslide
+\appendix
+
+\section{Theme functions}
+\label{sec:theme}
+
+\rcode{ggplot2} release 2.0.0 (or later) has a wide range of
+pre-defined themes, as well as theme generating and theme modifying
+functions. A list is:
+
+<<themes>>=
+apropos("^(theme$|theme_)") %>% noquote
+
+@
+\section{Two helper functions}
+\label{sec:appendix}
+
+These are needed to define harmonic terms and interactions.
+
+<<g4a,eval=FALSE>>=
+<<help>>
+@
+
+\newslide
+% \clearpage
+\phantomsection
+\addcontentsline{toc}{section}{References}
+\nocite{venables02:_moder_applied_statis_s}
+\bibliography{refs}
+
+\newslide
+\phantomsection
+\addcontentsline{toc}{section}{Session information}
+\section*{Session information}
+\label{sec:sessinfo}
+\vspace{-10pt}
+\begin{tiny}
+<<sessionInfo,echo=FALSE,results="asis",out.lines=200>>=
+cat("{\\bf\nDate: ", format(today()), "\n}")
+toLatex(sessionInfo(), locale = FALSE)
+@
+\end{tiny}
+
+
+
+\end{slide}
+
+\end{document}
+

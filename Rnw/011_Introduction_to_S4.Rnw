@@ -1,0 +1,397 @@
+\documentclass{seminar}
+\usepackage[utf8]{inputenc}
+
+\usepackage{RlogoNew}
+\usepackage{Rcolors}
+
+\usepackage{tabularx}
+\usepackage{SeminarExtra}
+\usepackage{op}
+
+\renewcommand{\hlcom}[1]{\textcolor[rgb]{0.625,0.125,0.9375}{\textsl{#1}}}%
+\renewcommand{\code}[1]{\textsl{\texttt{#1}}}
+\newcommand{\spreadout}{$\vphantom{\big\{}$\xspace}
+
+\DeclareGraphicsExtensions{.pdf,.png,.jpg,.JPG}
+\graphicspath{{Fig/}}
+
+<<"prelim",child="00-Prelim.Rnw">>=
+@
+
+<<setFigPath,include=FALSE>>=
+.infile <- sub("\\.Rnw$", "", knitr::current_input())
+knitr::opts_chunk$set(fig.path = paste0('Fig/', .infile, "_")) #$
+session <- sub("^0+", "", sub("[^[:digit:][:alpha:]].*$", "", .infile))
+@ 
+
+
+\usepackage{natbib}
+\bibliographystyle{chicago}
+
+\title{\Large \input{title.tex}
+  \Huge \red{Session \Sexpr{session}:\\[10pt]
+    Introduction to S4}}  %%% Change needed
+
+\input{authorAndDate}
+
+\begin{document}
+\setkeys{Gin}{keepaspectratio=TRUE}
+
+\begin{slide}
+\slidepagestyle{empty}
+
+  {\color{darkgreen}\maketitle}
+\end{slide}
+
+\begin{slide}
+\slidepagestyle{plain}
+\setcounter{slide}{1}
+
+\tableofcontents
+\newslide
+\section{Limitations of S3}
+\label{sec:Limitations of S3} 
+\begin{itemize}
+  \item S3 \emph{classes} exist only in the mind of the programmer.
+    This is a severe programming limitation.
+  \item S3 \emph{generic} functions dispatch methods based on the
+    (possibly induced) class of the \emph{principal} argument only.
+  \item S3 \emph{method functions} are not explicitly associated
+    with any generic function, but rather loosely linked using a
+    weak and fallible naming convention.
+  \item Nevertheless, in practice, for most purposes S3 classes and
+    methods are both easy to write, easy to use and work well!
+\end{itemize}
+\newslide
+\section{Example: Two sample $t-$test, S3 version}
+\label{sec:Two sample ttest S3 version}
+
+<<line_069_>>=
+TTest <- function(x, ...) {
+  UseMethod("TTest")
+}
+TTest.numeric <- function(x, y, ...) {  ## the work horse
+  stopifnot(is.numeric(y))
+  nx <- length(x)
+  ny <- length(y)
+  m <- mean(x) - mean(y)
+  s2 <- (sum((x - mean(x))^2) + sum((y - mean(y))^2))/(nx+ny-2)
+  sd <- sqrt(s2*(1/nx + 1/ny))
+  res <- within(list(tstat = m/sd, df = nx+ny-2), {
+    p.value <- 2*pt(-abs(tstat), df)
+  })
+  class(res) <- "TTest"
+  res
+}
+TTest.integr <- TTest.numeric
+@
+\newslide
+<<line_089_>>=
+TTest.factor <- function(x, y, ...) {
+  stopifnot(is.numeric(y), length(levels(x)) == 2)
+  x1 <- y[x == levels(x)[1]]
+  x2 <- y[x == levels(x)[2]]
+  TTest.numeric(x1, x2, ...)
+}
+
+TTest.character <- function(x, y, ...) {
+  TTest.factor(factor(x), y, ...)
+}
+
+TTest.formula <- function(x, data, ...) {
+  lhs <- eval(x[[2]], envir = as.environment(data))
+  rhs <- eval(x[[3]], envir = as.environment(data))
+  TTest.factor(as.factor(rhs), lhs, ...)
+}
+@
+\newslide
+Testing:
+<<line_109_>>=
+TTest(Days ~ Eth, quine)
+t.test(Days ~ Eth, quine, var.equal = TRUE)[cs(statistic, parameter)]
+@
+\newslide
+A \rcode{print} method
+<<line_115_>>=
+find("print")
+print
+print.TTest <- function(x, ...) {
+  with(x, cat("t = ", tstat, 
+              ", df = ", df,
+              ", p = ", p.value, "\n", sep = ""))
+  invisible(x)
+}
+
+TTest(Days ~ Eth, quine)
+@
+\newslide
+\section{Example: Two sample $t-$test, S4 version}
+\label{sec:Two sample ttest S4 version}
+
+
+First we should define a new class.
+<<line_133_>>=
+setClass("t_test", representation(x = "numeric",
+                                  y = "numeric",
+                                  t = "numeric",
+                                  df = "integer",
+                                  p = "numeric"))
+@
+Next, define a generic function to construct objects of the new class:
+<<line_141_>>=
+setGeneric("t_test", function(x, y) {
+  standardGeneric("t_test")
+})
+@
+A new function has been created but as yet does nothing
+\newslide
+The print method for such functions can be somewhat wordy:
+<<line_149_>>=
+t_test
+@
+Now to set a few methods so that we can use it:
+<<line_153_>>=
+setMethod("t_test", signature(x = "numeric", y = "numeric"),
+          function(x, y) {
+            tt <- stats::t.test(x, y, var.equal = TRUE) ## cheating!
+            with(tt, new("t_test", x = x, y = y, 
+                         t = statistic, 
+                         df = as.integer(parameter), 
+                         p = p.value))
+})
+@
+Other useful methods will essentially divert to this one, but in two ways
+<<line_164_>>=
+setMethod("t_test", signature(x = "factor", y = "numeric"),
+          function(x, y) {
+            hold <- y
+            lev <- levels(x)
+            y <- hold[x == lev[2]]
+            x <- hold[x == lev[1]]
+            callNextMethod(x, y)
+          })
+
+## If you put them in the wrong order...
+setMethod("t_test", signature(x = "numeric", y = "factor"),
+          function(x, y)
+            callGeneric(y, x))
+
+setMethod("t_test", signature(x = "formula", y = "data.frame"),
+          function(x, y) {
+            v <- eval(x[[2]], envir = y) ## the values
+            f <- eval(x[[3]], envir = y) ## the factor
+            callGeneric(f, v)
+          })
+@
+\newslide
+Where are we at so far?
+<<line_188_>>=
+showClass("t_test")
+showMethods("t_test")
+@
+\newslide
+At first test:
+<<line_194_,out.lines=16>>=
+t_test(Days ~ Eth, quine)
+@
+Ugh!
+\newslide
+The standard S4 display function for objects is \rcode{show} (rather than \rcode{print}), which has
+just one argument, \rcode{object}:
+<<line_201_>>=
+show
+
+setMethod("show", signature(object = "t_test"), 
+          function(object) {
+            cat("t = ", signif(object@t, digits = 3), 
+                ", df = ", object@df, 
+                ", p = ", signif(object@p, digits = 2), "\n", sep="")
+            invisible(object)
+})
+t_test(Days ~ Eth, quine)  ## that's better!
+@
+\newslide
+Since we have the data squirreled away, why not provide a graphical display as well?
+<<line_215_,out.height="0.5\\textheight",fig.show="hold",fig.height=4,fig.width=5.5>>=
+setGeneric("plot", graphics::plot)  ## technically unneeded.  If omitted ..
+setMethod("plot", signature(x = "t_test"),  ## .. this -> implicit generic
+          function(x, ..., col = c("#418A78", "#FC7115"), main = top, 
+                   horizontal = TRUE, border = "black", lwd = 0.5,
+                   xlab = if(horizontal) "sample value" else "sample") {
+            dat <- rbind(data.frame(f = "x", value = x@x), 
+                         data.frame(f = "y", value = x@y))
+            top <- capture.output(show(x))
+            oldPar <- par(cex.axis = 0.8, cex = 0.8, bty = "n")
+            on.exit(par(oldPar))
+            graphics::boxplot(value ~ f, dat, col = col, lwd = lwd,
+                              horizontal = horizontal, border = border,
+                              main = main, xlab = xlab, ...)
+            invisible(x)
+          })
+t0 <- t_test(Days ~ Eth, quine)
+plot(t0, names = levels(quine$Eth))
+plot(t0, names = levels(quine$Eth), horizontal = FALSE)
+@
+\newslide
+\section{Case study: A flexible \rcode{arrows} function}
+\label{sec:Case study}
+
+The \rfile{WWRGraphics} package has a version of \rcode{arrows} that extends
+\rcode{graphics::arrows} using S4 classes and methods.
+
+A class union:
+<<line_243_,include=FALSE>>=
+knitr::opts_chunk$set(eval = FALSE)
+@
+
+<<line_247_>>=
+#' An S4 class to represent alternavive complex, matrix or list input forms.
+#' @export
+setClassUnion("xy", c("complex", "matrix", "list"))
+@
+
+A standard generic function:
+<<line_254_>>=
+#' Arrows
+#'
+#' Front end to the \code{graphics::arrows} function allowing
+#' simplified specification of end points
+#'
+#' @param x0,y0 two numeric vectors of a single object of class \code{"xy"}
+#' @param x1,y1 two numeric vectors of a single object of class \code{"xy"}
+#' @param length length of the arrow head barb, in MILLIMETRES, 
+#'        see \code{\link{in2mm}}
+#' @param angle as for \code{graphics::arrows}
+#' @param gap numeric of length 1 or 2 giving the size of any gap to be left
+#'        between the arrow and the points which it connects, in MILLIMETRES
+#' @param circular logical: should the arrows link up with the initial point? 
+#'        (Single location argument only.)
+#' @param ... additional arguments passed on to \code{graphics::segments}
+#'
+#' @return invisible null value
+#' @export
+#' @examples
+#' z <- with(roundTrip, setNames(complex(real = Longitude, 
+#'                                       imaginary = Latitude), Locality))
+#' plot(z, asp = 1, pch = 20, cex = 0.7, xlab = "Longitude", ylab = "Latitude")
+#' arrows(z, cyc(z), col = "red", gap = c(0,1.5))
+setGeneric("arrows", function(x0, y0, ...)
+  standardGeneric("arrows"))
+@
+So far, so good.  Now for a few methods.
+\newslide
+<<line_283_>>=
+#' @rdname arrows
+#' @export
+setMethod("arrows", signature(x0 = "numeric", y0 = "numeric"),
+          function(x0, y0, x1, y1, length = 4, angle = 15, gap, ...) {
+            length <- mm2in(length)
+            if(!missing(gap)) {
+              stopifnot(is.numeric(gap) && length(gap) > 0 && 
+                          length(gap) < 3 && all(gap >= 0))
+              gap <- rep_len(mm2in(gap), length.out = 2)
+              if(any(gap > 0)) {
+                z0 <- usr2in(x0, y0); z1 <- usr2in(x1, y1)
+                gp0 <- gp1 <- z1 - z0
+                Mod(gp0) <- pmin(gap[1], Mod(gp0)/3)
+                Mod(gp1) <- pmin(gap[2], Mod(gp1)/3)
+                xy0 <- in2usr(z0 + gp0); xy1 <- in2usr(z1 - gp1)
+                x0 <- Re(xy0); y0 <- Im(xy0)
+                x1 <- Re(xy1); y1 <- Im(xy1)
+              }
+            }
+            graphics::arrows(x0 = x0, y0 = y0, x1 = x1, y1 = y1,
+                             length = length, angle = angle, ... )
+})
+@
+\newslide
+This method allows us to call \rcode{arrows} with two main arguments rather than four:
+<<line_309_>>=
+#' @rdname arrows
+#' @export
+setMethod("arrows", signature(x0 = "xy", y0 = "xy"),
+          function(x0, y0, ...) {
+            xy0 <- grDevices::xy.coords(x0)
+            xy1 <- grDevices::xy.coords(y0)
+            callGeneric(xy0$x, xy0$y, xy1$x, xy1$y, ...)
+          })
+@
+Finally, a method that allows us to call \rcode{arrows} with one argument only:
+\newslide
+<<line_321_>>=
+#' @rdname arrows
+#' @export
+setMethod("arrows", signature(x0 = "xy", y0 = "missing"),
+          function(x0, y0, ..., circular = FALSE) {
+            z <- with(grDevices::xy.coords(x0), complex(real = x, imaginary = y))
+            if(length(z) < 2) {
+              return(invisible(z))
+            }
+            if(circular) {
+              z0 <- z
+              z1 <- c(z[-1], z[1])
+            } else {
+              z1 <- z[-1]
+              z0 <- z[-length(z)]
+            }
+            callGeneric(Re(z0), Im(z0), Re(z1), Im(z1), ...)
+          })
+@
+\subsection{Examples}
+\label{sub:Examples}
+
+First some simple ones:
+<<line_344_,eval=TRUE,include=FALSE>>=
+knitr::opts_chunk$set(eval = TRUE)
+library(WWRGraphics)
+@
+<<line_348_>>=
+set.seed(1234)
+n <- 10
+z <- complex(real = runif(n), imaginary = runif(n))
+z <- z[order(Arg(z - mean(z)))]
+z1 <- complex(argument = Arg(z - mean(z)))/4
+plot(c(z, z+z1), asp = 1, type = "n", xlab = "x", ylab = "y")
+points(z)
+arrows(z, z+z1, col = "red", gap = 2, length = 2)
+arrows(z, col = "blue", circular = TRUE, gap = 3, length = 2)
+arrows(mean(z), z, gap = 3, length = 1, col = "grey")
+@
+\newslide
+A round trip.
+<<line_362_>>=
+z <- with(roundTrip, setNames(complex(real = Longitude, 
+                                      imaginary = Latitude), 
+                              Locality))
+par(cex.axis = 0.8, cex.lab = 0.8, font.main = 1)
+plot(z, asp = 1, pch = 20, cex = 0.7, 
+     xlim = c(110, 160), ylim = c(-45, -8),
+     xlab = "Longitude", ylab = "Latitude", bty = "n")
+grid(lty = "solid")
+lines(Oz, col = alpha("darkgreen", 0.5))
+text(z, names(z), pos = avoid(z), offset = 0.25, cex = 0.7)
+arrows(rev(z), col = "red", gap = c(0,1.5), length = 2)
+text("top left", c("Rockhampton to Brisbane:", 
+                   "The Scenic Route"), family = "serif")
+@
+
+
+\newslide
+\phantomsection
+\addcontentsline{toc}{section}{Session information}
+\section*{Session information}
+\label{sec:sessinfo}
+
+\begin{tiny}
+<<sessionInfo,echo=FALSE,results="asis",out.lines=200>>=
+cat("{\\bf\nDate: ", format(Sys.Date()), "\n}") 
+toLatex(sessionInfo(), locale = FALSE)
+@ %def
+\end{tiny}
+
+
+
+\end{slide}
+
+\end{document}
+

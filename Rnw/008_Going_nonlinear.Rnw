@@ -1,0 +1,614 @@
+\documentclass{seminar}
+\usepackage[utf8]{inputenc}
+
+\usepackage{RlogoNew}
+\usepackage{Rcolors}
+
+\usepackage{tabularx}
+\usepackage{SeminarExtra}
+\usepackage{op}
+
+\renewcommand{\hlcom}[1]{\textcolor[rgb]{0.625,0.125,0.9375}{\textsl{#1}}}%
+\renewcommand{\code}[1]{\textsl{\texttt{#1}}}
+\newcommand{\spreadout}{$\vphantom{\big\{}$\xspace}
+
+\DeclareGraphicsExtensions{.pdf,.png,.jpg,.JPG}
+\graphicspath{{Fig/}}
+
+<<"prelim",child="00-Prelim.Rnw">>=
+@
+
+<<setFigPath,include=FALSE>>=
+.infile <- sub("\\.Rnw$", "", knitr::current_input())
+knitr::opts_chunk$set(fig.path = paste0('Fig/', .infile, "_")) #$
+session <- sub("^0+", "", sub("[^[:digit:][:alpha:]].*$", "", .infile))
+@ 
+
+
+\usepackage{natbib}
+\bibliographystyle{chicago}
+
+\title{\Large \input{title.tex}
+  \Huge \red{Session \Sexpr{session}:\\[10pt]
+    Going Non-linear}}  %%% Change needed
+
+\input{authorAndDate}
+
+\begin{document}
+\setkeys{Gin}{keepaspectratio=TRUE}
+
+\begin{slide}
+\slidepagestyle{empty}
+
+  {\color{darkgreen}\maketitle}
+\end{slide}
+
+\begin{slide}
+\slidepagestyle{plain}
+\setcounter{slide}{1}
+
+\tableofcontents
+\newslide
+<<include=FALSE>>=
+suppressPackageStartupMessages(library(lme4))
+@
+
+\section{Stormer viscometer revisited}
+
+Look again at the data:
+
+<<>>=
+p0 <- ggplot(Stormer) + 
+  aes(x = Viscosity, y = Time, group = factor(Weight), colour = factor(Weight)) +
+  geom_point(size = 1.25)  + theme_bw() + 
+  geom_line(linetype = "dashed", colour = "grey") + 
+  scale_color_brewer(palette = "Dark2", name = "Weight (gm)") +
+  theme(legend.position = "bottom")
+
+p0  + geom_point(aes(x = 0, y = 0), inherit.aes = FALSE, size = 0.7)
+@
+
+\newslide
+The model from theory is
+$$
+\mbox{Time} = \frac{\beta \mbox{ Viscosity}}{\mbox{Weight} - \theta} + \varepsilon
+$$
+where $\varepsilon$ is a $\mbox{N}(0, \sigma^2)$ measurement.  
+\begin{itemize}
+  \item If we knew $\theta$ this would be a regression (through the origin).
+  \item Not knowing $\theta$ makes this a \emph{non-linear} regression.
+  \item $\beta$ is known as a \emph{linear parameter}.  Special algorithms are
+  available for non-linear models with one or more linear parameters.  
+\end{itemize}
+
+Parameters are estimated by least squares ($\equiv$ maximum likelihood), but the
+process is necessarily iterative, and the algorithms need a bit of help.
+\begin{itemize}
+  \item Starting approximate values are needed for the non-linear parameters,
+  \item If the partial derivatives of the model function with respect to the
+  parameters are also supplied, this can improve the process.
+\end{itemize}
+\newslide
+\subsection{Finding initial values and first fit}
+This usually requires either good inside knowledge -- or some ingenuity.
+
+Ignore $\varepsilon$ for now, multiply through by $(\mbox{Weight} - \theta)$ and
+re-arrange the terms.  This gives the ``pseudo-model'':
+$$
+\mbox{Time}\times\mbox{Weight} \approx \beta\mbox{ Viscosity} + \theta\mbox{ Time}
+$$
+This looks like a linear regression. Let's fit it despite the outrage:
+<<>>=
+storm_iv <- lm(I(Time*Weight) ~ 0 + Viscosity + Time, Stormer)
+(init <- setNames(coef(storm_iv), c("beta", "theta")))
+@
+Fitting the model is now easy:
+<<>>=
+storm_nl <- nls(Time ~ beta*Viscosity/(Weight-theta), data=Stormer, start=init)
+round(summary(storm_nl)$coefficients, digits = 3)
+@
+\newslide
+\subsection{Inspecting the fit}
+Put the model predictions on the graph of the data:
+
+<<>>=
+m <- with(Stormer, tapply(Viscosity, Weight, max))
+w <- as.numeric(names(m))
+pStormer <- rbind(cbind(Viscosity = 0,         Weight = w), 
+                  cbind(Viscosity = unname(m), Weight = w)) %>% 
+  data.frame()
+pStormer$Time <- predict(storm_nl, newdata = pStormer)
+pStormer
+
+p0 + geom_line(data = pStormer)
+
+@
+\subsection{Adding derivatives}
+
+This extension is \emph{required} for non-linear random effect models.
+<<>>=
+(stormer <- deriv(~ b*V/(W - t), namevec = c("b", "t"), 
+                  function.arg = function(V, W, b, t) {}) %>% fix_deriv())
+@
+\newslide
+Putting the function into action:
+<<>>=
+storm_nl2 <- nls(Time ~ stormer(Viscosity, Weight, beta, theta), Stormer, 
+                 start = init)
+summary(storm_nl2)
+@
+Wouldn't it be great if we could put the initial value process into code as well?  We can!
+\newslide
+\subsection{Self-starting models}
+This is something of a detailed topic, but important if you work in this area.
+<<>>=
+SSstormer <- selfStart(model = ~ b*v/(w - c), parameters = c("b", "c"),
+                       initial = function(mCall, data, LHS) { ## the tricky bit
+                         t <- eval(LHS, data)
+                         v <- eval(mCall[["v"]], data)
+                         w <- eval(mCall[["w"]], data)
+                         b <- coef(lm(I(w*t) ~ 0 + v + t))
+                         setNames(b, mCall[c("b", "c")])
+                       },
+                       template = function(v, w, b, c) {})
+storm_nl3 <- nls(Time ~ SSstormer(Viscosity, Weight, beta, theta),
+                 data = Stormer)
+coef(storm_nl3)
+@
+\newslide
+\subsection{Removing the kinks}
+
+One possible reason for the (apparently) systematic `kniks' in the data might be
+that the assumed viscosities contained measurement errors.  This suggests we at least
+\emph{look at} a model of the form
+$$
+\mbox{Time} = \frac{\beta\left(\mbox{Viscosity} + \phi\right)}{\mbox{Weight} - \theta} + \varepsilon
+            = \frac{(\beta\phi) + \beta\mbox{ Viscosity}}{\mbox{Weight} - \theta} + \varepsilon
+$$
+The initial value 'pseudo-model' is only mildly changed:
+$$
+\mbox{Time}\times\mbox{Weight} \approx \beta^{\star} + \beta\mbox{ Viscosity} + \theta\mbox{ Time}
+$$
+where $\beta^{\star} = \beta\phi$ is a simple re-parametrisation.  This allows us to devise an
+initial value function and a self-starting model.  
+\newslide
+<<>>=
+SSstormer2 <- selfStart(~ b*(v + f)/(w - c), 
+                        parameters = c("b", "c", "f"),
+                        initial = function (mCall, data, LHS) {
+                          t <- eval(LHS, data)
+                          v <- eval(mCall[["v"]], data)
+                          w <- eval(mCall[["w"]], data)
+                          b <- coef(lm(I(w * t) ~ 1 + v + t))  ## incl intercept
+                          b <- c(b[2:3], b[1]/b[2])            ## change back
+                          setNames(b, mCall[c("b", "c", "f")])
+                        },
+                        template = function(v, w, b, c, f) {}) %>% fix_deriv()
+storm_nl4 <- nls(Time ~ SSstormer2(Viscosity, Weight, beta, theta, phi), 
+                 data = Stormer)
+coef(storm_nl4)
+@
+This suggests there could be a negative bias of $\phi = \Sexpr{round(coef(storm_nl4)[["phi"]], 3)}$.  
+A more thorough investigation may allow $\phi$ to vary for the different ``known'' viscosities.
+\newslide
+\subsubsection{Random effects}
+
+Rather than fit a different $\phi$ for each viscosity, a more realistic approach with such a small
+dataset is to allow $\phi$ to have a random component, $\phi + \delta$, where $\delta$ varies
+over the different viscosities, $\delta \sim \mbox{N}\left(0, \sigma^2_{\delta}\right)$.
+
+The fitting function is \rcode{lme4::nlemr}, and the main point of difference is the way the formula
+specifies the random effects.  Self-starting model functions still work (provided they are adjusted
+by \rcode{fix\_deriv()}!) but do not generate starting values.  These must be supplied, but need only
+be supplied for the fixed effect parts.
+<<>>=
+storm_nle <- nlmer(
+  Time ~ SSstormer2(Viscosity,Weight,beta,theta,phi) ~ (phi|Viscosity), ## 3-form
+  data = Stormer, start = coef(storm_nl4))                              ## start!
+rbind(`base model`            = c(coef(storm_nl), phi = 0), 
+      perturbed               = coef(storm_nl4), 
+      `nlmer (fixed effects)` = fixef(storm_nle)) %>% round(4)
+@
+\newslide
+The BLUPs ($\phi + \delta$) are shown below
+<<>>=
+(B <- coef(storm_nle)$Viscosity)
+@
+We now adjust the viscosity values by adding on these BLUPs to see to what extent
+they ``straighten out the kinks'' in the graphic.
+<<>>=
+phi <- setNames(B[["phi"]], rownames(B))
+Stormer <- within(Stormer, {
+  Viscosity_phi <- Viscosity + phi[factor(Viscosity)]
+})
+@
+\newslide
+The model has one additional parameter, $\phi$, as the random effects, $\delta$, have
+the logical status of residuals.  The model is not realistic, but intended merely to
+raise possibilities: if there are errors in the viscosities, which one might be in
+error and by how much?  
+
+The diagnostic graphic is below.  It shows the magnitude of the adjustments and the
+effect on the data.
+
+<<>>=
+p0 <- ggplot(Stormer) + aes(x = Viscosity_phi, y = Time) + 
+  geom_point(aes(colour = factor(Weight)), size = 0.7) +
+  geom_line(aes(colour = factor(Weight))) +
+  geom_point(aes(x = Viscosity), size = 0.7) +
+  geom_segment(aes(xend = Viscosity, yend = Time), colour = "grey") +
+  geom_point(aes(x = 0, y = 0)) +
+  xlab(expression(Viscosity + (phi + delta))) + 
+  scale_colour_brewer(palette = "Dark2", name = "Weight (gm)") + 
+  theme_bw() + theme(legend.position = "bottom")
+p0
+@
+\newslide
+\section{Weight loss and exponential growth}
+The weight loss gives the weight of an obese patient on a medically controlled
+diet over approximately 9~months.  Our goal is to investigate what is the likely
+future track of the weight of the patient.
+
+The model we have in mind is a negative exponential growth curve:
+$$
+\mbox{Weight} = \beta_0 + \beta_1\exp\left(-\mbox{Days}/\theta\right) + \varepsilon
+$$
+Note that $\beta_0+\beta_1$ is the weight at day~0 and $\beta_0$ is the (projected)
+ultimate lean weight.  So $\beta_1$ is the amount of weight to be lost.  The
+parameter $\theta$ is related to the ``half-life'' of the diet: if $\mbox{Days} = \theta\log 2$
+then the mean weight is $\beta_0 + \beta_1\frac12$, i.e. half the `losable' weight has been lost.
+
+First look at the data:
+<<>>=
+p0 <- ggplot(wtloss) + aes(x = Days, y = Weight) + geom_point() + theme_bw()
+p0
+@
+\newslide
+Polynomial models work well within the range of the diet, but fail
+badly outside.  
+
+Bariatric physicians suggest that if a patient can maintain a
+weight for two years the chances of remaining at the lower weight are much greater.
+
+So let's push it!
+
+<<>>=
+pWtloss <- data.frame(Days = 0:730)  ## two years
+pWtloss <- within(pWtloss, {
+  quadratic <- predict(lm(Weight ~ poly(Days, 2), wtloss), pWtloss)
+  cubic     <- predict(lm(Weight ~ poly(Days, 3), wtloss), pWtloss)
+})
+pwt <- pWtloss %>% pivot_longer(cols = c(quadratic, cubic), 
+                                names_to = "degree", 
+                                values_to = "Weight")%>% 
+  mutate(degree = factor(degree, levels = cq(quadratic, cubic))) ## cq() ...
+
+p0 + geom_line(data = pwt, aes(colour = degree)) +
+  scale_colour_brewer(palette = "Dark2") + 
+  theme(legend.position = "bottom")
+@
+\newslide
+Now turn to the non-linear model.
+$$
+\mbox{Weight} = \beta_0 + \beta_1\exp\left(-\mbox{Days}/\theta\right) + \varepsilon
+$$
+To get initial values, one technique is
+\begin{itemize}
+  \item Get good estimates of the curve at three equally-spaced time points,
+  \item Equate these to the model to give three equations,
+  \item Solve for the three parameters $\beta_0$, $\beta_1$ and $\theta$.
+\end{itemize}
+For this model the equations can be solved algebraically, which is the idea behind
+the self-starting model we will define.
+
+Note that if we solve the equations for $\theta$ first, the other two parameters
+are \emph{linear parameters}, and initial values for them can then be found by
+linear regression.
+
+Further details behind the code are left as a puzzle for the student!
+\newslide
+\subsection{A self-starting model}
+
+Our self-starting model is as follows:
+<<>>=
+SSnegexp <- selfStart(model = ~ b0 + b1*exp(-t/theta),
+                      parameters = c("b0", "b1", "theta"),
+                      initial = function(mCall, data, LHS) {
+                        t <- eval(mCall[["t"]], data)
+                        y <- eval(LHS, data)
+                        r <- range(t)
+                        d <- (r[2] - r[1])/4
+                        yf <- predict(lm(y ~ poly(t, 2)), 
+                                      data.frame(t = r[1] + (1:3)*d))
+                        ratio <- (yf[1] - yf[2])/(yf[2] - yf[3])
+                        stopifnot(ratio > 0)
+                        theta <- d/log(ratio)
+                        b <- coef(lm(y ~ 1 + exp(-t/theta)))
+                        setNames(c(b, theta), mCall[c("b0", "b1", "theta")])
+                      }) %>% fix_deriv()
+@
+Now we try it out!
+\newslide
+<<>>=
+wtloss_ne <- nls(Weight ~ SSnegexp(Days, b0, b1, theta), data = wtloss, 
+                 trace = TRUE)
+summary(wtloss_ne)
+@
+\newslide
+The model estimates imply that
+\begin{itemize}
+  \item The stable weight is $\hat\beta_0 = \Sexpr{coef(wtloss_ne)[["b0"]]}$ kilograms,
+  \item The amount of weight to be lost is $\hat\beta_1 = \Sexpr{coef(wtloss_ne)[["b1"]]}$ kilograms,
+  \item The half-life of the diet is 
+    $\hat\theta\times\log 2 = \Sexpr{coef(wtloss_ne)[["theta"]]}\times\Sexpr{log(2)} \approx 
+    \Sexpr{round(coef(wtloss_ne)[["theta"]]*log(2))}$ days.  In other words, half the \emph{remaining}
+    weight to be lost, will be lost every \Sexpr{round(coef(wtloss_ne)[["theta"]]*log(2)/7)}~weeks
+    (according to the model!).
+\end{itemize}
+
+We now look at how the model compares in extrapolation to the polynomial models:
+<<>>=
+pWtloss$negexp <- predict(wtloss_ne, pWtloss)
+pwt <- pWtloss %>% pivot_longer(cols = c(quadratic, cubic, negexp), 
+                                names_to = "degree", 
+                                values_to = "Weight") %>% 
+  mutate(degree = factor(degree, levels = cq(quadratic, cubic, negexp))) ## cq()
+p0 + geom_line(data = pwt, aes(colour = degree)) +
+  geom_hline(yintercept = coef(wtloss_ne)[["b0"]],colour = "grey",
+             linetype = "dashed")+
+  scale_colour_brewer(palette = "Dark2") + theme(legend.position = "bottom")
+@
+\subsection{Progressive model fitting}
+
+What the patient would like to know is what the model is suggesting progressively as the regime proceeds.
+
+First a few preparatory steps:
+
+<<>>=
+period <- 28 ## Recalibrate every 4 weeks
+
+W0 <- with(wtloss, Weight[Days == 0])
+tab <- cbind(Days          = 0, 
+             n             = 1, 
+             Weight        = W0, 
+             Final         = NA, 
+             `Yet to lose` = NA, 
+             `Half life`   = NA) 
+
+end <- with(wtloss, max(Days))  ## Latest data available
+
+full_model <- nls(Weight ~ SSnegexp(Days, W0, w, theta), wtloss)
+
+@
+\newslide
+
+Fit models to the progressive data sets and present the results:
+
+<<tab, eval=FALSE>>=
+days <- 0
+while(days < end) {
+  days <- min(end, days + period)
+  n <- with(wtloss, sum(Days <= days))  ## sample size
+  m <- update(full_model, data = filter(wtloss, Days <= days)) 
+  b <- coef(m)
+  w <- predict(m, data.frame(Days = days))
+  tab <- rbind(tab, unname(c(days, n, w, b[1], w-b[1], log(2)*b[3])))
+}
+tab <- data.frame(tab, check.names = FALSE) %>% 
+  within({
+    Change <- c(NA, diff(Weight))
+  }) %>% 
+  select(Days, n, Weight, Change, everything())
+
+booktabs(tab, digits = 0) %>% print(include.rownames = FALSE)
+@
+
+<<results="asis", echo=FALSE>>=
+<<tab>>
+@
+\newslide
+\section{Muscle shortening}
+
+From \rcode{?MASS::muscle}:
+
+\begin{quote}
+  The purpose of this experiment was to assess the influence of calcium 
+  in solution on the contraction of heart muscle in rats. The left auricle
+  of 21 rat hearts was isolated and on several occasions a constant-length
+  strip of tissue was electrically stimulated and dipped into various
+  concentrations of calcium chloride solution, after which the shortening
+  of the strip was accurately measured as the response.
+  
+  \footnotesize
+  Linder, A., Chakravarti, I. M. and Vuagnat, P. (1964) Fitting asymptotic
+  regression curves with different asymptotes. In {\it Contributions to 
+  Statistics. Presented to Professor P. C. Mahalanobis on the occasion of 
+  his 70th birthday}, ed. C. R. Rao, pp. 221–228. Oxford: Pergamon Press
+\end{quote}
+The data is also provided in \rfile{WWRData}.  First look at the data
+\newslide
+
+The data are very sparse and fragmentary:
+
+<<>>=
+p0 <- ggplot(muscle) + aes(x = Conc, y = Length) + 
+  geom_point(size = 0.7) +
+  xlab("CaCl concentration") + ylab("Contraction (mm)") +
+  facet_wrap(~ Strip, nrow = 3) +
+  theme_bw() + 
+  theme(strip.background = element_rect(fill = "wheat"))
+p0 + geom_line(colour = "sky blue") 
+@
+\newslide
+\subsection{Linear models}
+Before going to asymptotic regressions, consider fitting quadratic polynomials
+with separate intercepts and slopes, but with a fixed coefficient of $x^3$.  We could
+do this with \emph{fixed} or \emph{random} coefficients.
+
+The two superficially similar models behave \emph{very} differently!
+
+<<>>=
+mfix <- lm(Length ~ 0 + Strip/Conc + I(Conc^2/2), data = muscle)
+mran <- lmer(Length ~ Conc + I(Conc^2/2) + (1 + Conc|Strip), data = muscle)
+pMuscle <- with(muscle, expand.grid(
+  Strip = levels(Strip), Conc = seq(min(Conc), max(Conc), length = 100))
+)
+pMuscle <- within(pMuscle, {
+  fixed  <- predict(mfix, pMuscle)
+  random <- predict(mran, pMuscle, re.form = ~(1 + Conc|Strip))
+}) 
+pms <- pMuscle %>% pivot_longer(cols = c(fixed, random), names_to = "Model", 
+                                values_to = "Length")
+p0 + geom_line(data = pms, aes(colour = Model)) +
+  scale_colour_brewer(palette = "Set2") + ylim(0, 45) +
+  theme(legend.position = "bottom") + labs(title = "Quadratic Polynomial Models")
+@
+\newslide
+\subsection{Gompertz growth curve model}
+The suggested model in the original publication is a Gompertz growth curve, with
+the mean of the form
+$$
+\mu = \exp\left(\beta_0 - \beta_1\rho^x\right)
+$$
+where typically $0 < \rho < 1$.  Writing $\theta = -1/\log \rho$, 
+(so $\rho = e^{-1/\theta}$), which is positive,
+the model may also be written as 
+$$
+\log \mu = \beta_0 - \beta_1\exp\left(-\frac{x}{\theta}\right)
+$$
+I.e. the model is a negative exponential model in the log scale.  This provides
+a simple way to write an initial value function, and hence a self-starting model.
+
+The sign change, $-\beta_1$, usually means the function will \emph{increase} to
+an asymptotic value rather than \emph{decrease} as was the case with the weight
+loss model.
+\newslide
+A self-starting Gompertz growth curve model is below.  (There is already an \rcode{SSgompertz} function
+in the \rfile{stats} package which uses another parametrisation.)
+
+<<>>=
+SSgompertz2 <- selfStart(model = ~ exp(b0 - b1*rho^x), 
+                         parameters = c("b0", "b1", "rho"),
+                         initial = function(mCall, data, LHS) {
+                           x <- eval(mCall[["x"]], data)
+                           y <- eval(LHS, data)
+                           r <- range(x)
+                           d <- (r[2] - r[1])/4
+                           yf <- predict(lm(log(y) ~ poly(x, 2)),
+                                         data.frame(x = r[1] + (1:3)*d))
+                           ratio <- ((yf[3] - yf[2])/(yf[2] - yf[1]))
+                           stopifnot(ratio > 0)
+                           rho <- ratio^(1/d)
+                           b <- coef(lm(log(y) ~ 1 + I(-rho^x)))
+                           setNames(c(b, rho), mCall[c("b0", "b1", "rho")])
+                         }) %>% fix_deriv()
+@
+
+(This is included in the \rfile{WWRCourse} package as well.)
+\newslide
+\subsubsection{Fixed and random effect models}
+We now fit the equivalent of the fixed effect only polynomial model.  In this
+case the $\rho$ parameter will be the same for all \rcode{Strip}s, but the
+parameters $\beta_0$ and $\beta_1$ will be particular to the strip.
+<<>>=
+m0 <- nls(Length ~ SSgompertz2(Conc, b0, b1, rho), data = muscle) ## Ignore Strip
+b <- coef(m0)
+init <- list(b0 = rep(b[["b0"]], 21),  ## must be a list for indexed parameters
+             b1 = rep(b[["b1"]], 21), 
+             rho = b[["rho"]])
+fgomp <- nls(Length ~ exp(b0[Strip] - b1[Strip]*rho^Conc), data = muscle, 
+             start = init)
+rgomp <- nlmer(Length ~ SSgompertz2(Conc, b0, b1, rho) ~ b0 + b1|Strip,
+               data = muscle, start = coef(m0))
+@
+Prediction is easy for the fixed effect model:
+<<>>=
+pMuscle <- within(pMuscle, {
+  fixed <- predict(fgomp, pMuscle)  ## replaces the previous component
+})
+@
+But the random effect model requires some work ``by hand''.
+\newslide
+First look at fixed and random effects:
+<<out.lines=10>>=
+fixef(rgomp)
+ranef(rgomp)$Strip
+@
+The coefficients (= ``parameters'' for non-linear models) combine the two:
+\newslide
+<<out.lines=5>>=
+(B <- coef(rgomp)$Strip)
+@
+Make a data frame extending this with the \rcode{Strip} labels included and merge
+it with \rcode{pMuscle}.  Then complete the computation by hand:
+<<>>=
+B <- B %>% rownames_to_column("Strip") %>% untibble()
+pMuscle <- pMuscle %>% left_join(B, by = "Strip") %>% 
+  mutate(random = exp(b0 - b1*rho^Conc), Strip = factor(Strip)) %>% 
+  select(Strip, Conc, fixed, random)
+@
+Now we can repeat the same display as with the polynomial models.
+<<>>=
+pms <- pMuscle %>% pivot_longer(cols = c(fixed, random), names_to = "Model", 
+                                values_to = "Length")
+p0 + geom_line(data = pms, aes(colour = Model)) +
+  scale_colour_brewer(palette = "Set2") + ylim(0, 45) +
+  theme(legend.position = "bottom") + labs(title = "Gompertz Growth Curve Models")
+@
+\newslide
+\subsection{Epilogue}
+\begin{itemize}
+  \item The relationship was known to be asymptotic, so the polynomial models are at best a first step.
+  It is clear that the ``shrinkage'' effect of the random effect model has conferred more stability
+  on the result even for these models.
+  \item The green curves (fixed model) in the final display correspond to the model fitted \emph{by hand}
+  in the original 1964 article.  Forcing the relationship to be asymptotic has clearly given them
+  some stability. (The non-linear fitting technology was not available in 1964, of course!)
+  \item Random effect models are often claimed to be very effective for handling sparse or ``scrappy''
+  data.  There seems to be good empirical evidence for this.
+  \item An older package, \rcode{nlme}, (which is part of core \R) has some pro's and con's relative
+  to \rcode{lmer}.  It has a different calling interface, much more complicated than that of
+  \rcode{lmer}, but offers some convenience functions as well.  This includes 
+code{predict} methods
+  for non-linear models.  The code to fit our Gompertz random effect model and predict is given below
+\end{itemize}
+<<>>=
+suppressPackageStartupMessages({
+  library(nlme)
+})
+rgomp <- nlme(Length ~ SSgompertz2(Conc, b0, b1, rho), data = muscle, 
+           fixed = b0 + b1 + rho ~ 1, random = b0 + b1 ~ 1|Strip, 
+           start = coef(m0))
+pMuscle <- within(pMuscle, {
+  fixed  <- predict(fgomp, pMuscle)  ## replaces the component (not needed!)
+  random <- predict(rgomp, pMuscle, level = 1)  ## replaces the previous component
+  common <- predict(rgomp, pMuscle, level = 0)  ## same for all strips (fixef)
+})
+pms <- pMuscle %>% pivot_longer(cols = c(fixed, random, common), 
+                                names_to = "Model", values_to = "Length") %>% 
+  mutate(Model = factor(Model, levels = cq(fixed, random, common)))
+p0 + geom_line(data = pms, aes(colour = Model)) +
+  scale_colour_brewer(palette = "Set2") + ylim(0, 45) +
+  theme(legend.position = "bottom") + labs(title = "Gompertz Models (nlme)")
+@
+
+
+\newslide
+\phantomsection
+\addcontentsline{toc}{section}{Session information}
+\section*{Session information}
+\label{sec:sessinfo}
+
+\begin{tiny}
+<<sessionInfo,echo=FALSE,results="asis",out.lines=200>>=
+cat("{\\bf\nDate: ", format(Sys.Date()), "\n}") 
+toLatex(sessionInfo(), locale = FALSE)
+@ %def
+\end{tiny}
+
+
+
+\end{slide}
+
+\end{document}
+

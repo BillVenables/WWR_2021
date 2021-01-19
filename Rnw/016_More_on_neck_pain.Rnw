@@ -1,0 +1,460 @@
+\documentclass{seminar}
+\usepackage[utf8]{inputenc}
+
+\usepackage{RlogoNew}
+\usepackage{Rcolors}
+
+\usepackage{tabularx}
+\usepackage{SeminarExtra}
+\usepackage{op}
+
+\renewcommand{\hlcom}[1]{\textcolor[rgb]{0.625,0.125,0.9375}{\textsl{#1}}}%
+\renewcommand{\code}[1]{\textsl{\texttt{#1}}}
+\newcommand{\spreadout}{$\vphantom{\big\{}$\xspace}
+
+\DeclareGraphicsExtensions{.pdf,.png,.jpg,.JPG}
+\graphicspath{{Fig/}}
+
+<<"prelim",child="00-Prelim.Rnw">>=
+@
+
+<<setFigPath,include=FALSE>>=
+.infile <- sub("\\.Rnw$", "", knitr::current_input())
+knitr::opts_chunk$set(fig.path = paste0('Fig/', .infile, "_")) #$
+session <- sub("^0+", "", sub("[^[:digit:][:alpha:]].*$", "", .infile))
+@ 
+
+
+\usepackage{natbib}
+\bibliographystyle{chicago}
+
+\title{\Large \input{title.tex}
+  \Huge \red{Session \Sexpr{session}:\\[10pt]
+    More on Neck Pain:\spreadout Analysis}}  %%% Change needed
+
+\input{authorAndDate}
+
+\begin{document}
+\setkeys{Gin}{keepaspectratio=TRUE}
+
+<<libs,include=FALSE>>=
+library(WWRCourse)
+library(haven)
+@
+
+<<makeData,include=FALSE,cache=TRUE>>=
+
+###########################################################################
+###########################################################################
+###                                                                     ###
+###           THIS SECTION RE-MAKES THE NECK PAIN DATA SETS,            ###
+###                INCLUDING PLUGGING THE MISSING VALUES                ###
+###                                                                     ###
+###########################################################################
+###########################################################################
+
+##---------------------------------------------------------------
+##                        A useful helper                       -
+##---------------------------------------------------------------
+
+zfill <- function(x) {  ## handy for making uniform stringwidth.
+  m <- max(n <- nchar(x <- as.character(x)))
+  paste0(strrep(0, m-n), x)
+}
+
+#################################################################
+##           Read in data and do basic manipulations           ##
+#################################################################
+
+NeckPain <- read_stata(system.file("extdata", "stata", "NeckPainStudy.dta",
+                                   package = "WWRCourse")) %>%
+  lapply(function(x) if(is.labelled(x)) {
+    as_factor(x)
+  } else {
+    as.vector(x)
+  }) %>% data.frame %>% 
+  select(-contains("_cat_")) %>% ## remove categoricals
+  within({
+    Ident <-   paste0("S", zfill(idd))     %>% factor()
+    Cluster <- paste0("C", zfill(cluster)) %>% factor()
+  }) %>% 
+  rename(Sex = sex, Group = grp, Organisation = organisation,
+         Industry = industry, Ergo = ergo, Age = age,
+         BMI = bmi, Education = edu, Occupation = occ,
+         Comorbidity = cm) %>% 
+  select(Ident, Cluster, Group, Organisation:Occupation,
+         Comorbidity, pain_num_b:pain_num_9m)
+
+
+#################################################################
+##                     Plug missing values                     ##
+#################################################################
+
+set.seed(20190205)
+Extract <- NeckPain %>% 
+  select(Group:Comorbidity) %>%  ## only these...
+  rfImputeUnsupervised() %>%     ## The black box plugger
+  within({                       ## do a bit of cleaning-up
+    Ergo <- round(Ergo)
+    Age <- round(Age)
+    BMI <- round(BMI, 2)
+  })
+NeckPain[, names(Extract)] <- Extract   ## plut the gaps 
+rm(Extract)                             ## destroy the evidence...
+
+#################################################################
+##     Make a long form version of the data and make Treat     ##
+#################################################################
+
+longNeckPain <- NeckPain %>% 
+  gather(key = Time, value = NPain, pain_num_b:pain_num_9m) %>% 
+  within({
+    time <- Time                  %>% ## currently a mess
+      sub("b$", "0", .)           %>% ## final 'b' -> 0
+      gsub("[^[:digit:]]", "", .) %>% ## ditch any non-digit
+      as.numeric()                    ## coerce to a number
+    Time <- ordered(paste0("T", zfill(time)))
+    Treat <- ifelse(time == 0, "Base", paste0(substring(Group, 0, 1),
+                                              substring(Time, 2))) 
+  }) %>% select(Ident:Group, Time, time, Treat,
+                Organisation:Comorbidity, NPain) %>% 
+  arrange(Ident, Time) %>% 
+  na.omit
+
+#################################################################
+##                     End of data section                     ##
+#################################################################
+@ 
+\begin{slide}
+\slidepagestyle{empty}
+
+
+  {\color{darkgreen}\maketitle}
+\end{slide}
+
+\begin{slide}
+\slidepagestyle{plain}
+\setcounter{slide}{1}
+
+\tableofcontents
+
+\newslide
+
+\section{Making the data }
+\label{sec:make}
+
+The script for this section contains the \R code to reproduce the
+data, which you should run again.  
+
+This is a reminder of the variables names and an assurance that the
+data appears clean, with no missing values:
+
+<<miss>>=
+colSums(is.na(longNeckPain))
+@ 
+
+\newslide
+\section{Initial models}
+\begin{itemize}
+  \item A \emph{longitudinal} study; need to recognize that
+  some readings refer to the \emph{same} participant and some
+  to \emph{different}. $\large \rightarrow$ random effect models.
+  \item \rcode{Sex} will clearly be a dominant fixed effect term,
+  but the study is designed to assess \rcode{Treat}.
+  \item Initially we use \rcode{Time} and \rcode{Group} instead
+  of \rcode{Treat} directly, but incorporate the latter, later.
+  \item The strategy will be to build an initial random effect 
+  linear model with a fairly large fixed effect component, and to
+  refine the model down to something justified by the data.
+  \item The response, \rcode{NPain}, is a discrete variable with
+  possible values $0, 1, 2, \ldots, 9$.  It seems to be skewed as
+  well.  Nevertheless normal (gaussian) models still prove useful
+  for investigative purposes.
+\end{itemize}
+
+\newslide
+\subsection{Neck pain score}
+
+\begin{center}
+\begin{footnotesize}
+<<mod1,results="asis">>=
+suppressPackageStartupMessages(library(lme4))
+mod_0 <- lmer(NPain ~ Sex*(Time*Group + Age + 
+                             BMI + Comorbidity + Ergo + Industry) +
+                (1|Ident), data = longNeckPain)
+dropterm(mod_0) %>% 
+  booktabs(digits=c(0, 0, 2, 4, 4))
+@
+\end{footnotesize}
+\end{center}
+\newslide
+\begin{itemize}
+  \item There are no model refinement tools available in the public
+  packages, but a simple backward elimination tool is provided
+  in \rfile{WWRCourse}.  
+  \item It is similar to \rcode{MASS::stepAIC}
+  but only provides backward elimination.
+  \item Only \emph{fixed effect} terms are considered
+  for removal; all random effects are retained.
+  \item The function is \rcode{step\_down()}; at each stage it
+  removes the current (non-marginal) term that
+  \emph{most reduces} the AIC criterion.
+  \item The process stops when removing any remaining term
+  would \emph{increase} AIC.
+\end{itemize}
+
+\newslide
+\begin{center}
+\begin{footnotesize}
+<<mod2,results="asis",cache=TRUE,xx=0>>=
+mod_0s <- step_down(mod_0)
+dropterm(mod_0s) %>% 
+  booktabs(digits=c(0, 0, 2, 4, 4))
+@
+\end{footnotesize}
+\end{center}
+
+\begin{itemize}
+  \item The remaining terms are not all ``significant'' in the
+  conventional sense, but if any factors are useful for a model
+  they are likely to be included in this set.
+  \item We gain an insight into the implications of the 
+  (fixed effect part of) the model by considering it's 
+  implications for prediction.
+\end{itemize}
+
+\newslide
+<<mod3>>=
+pNeckPain <- with(longNeckPain, 
+                  expand.grid(Time = levels(Time),
+                              Group = levels(Group),
+                              Sex = levels(Sex),
+                              Comorbidity = c(0, 2),
+                              BMI = quantile(BMI, c(0.25, 0.75)) %>% round))
+pNeckPain$NPain <- predict(mod_0s, pNeckPain, re.form = ~0)
+ggplot(pNeckPain) + aes(x = Time, y = NPain, group = Group,
+                        linetype = Group, colour = Sex) + 
+  geom_point() + geom_line() + facet_grid(Sex ~ BMI + Comorbidity) +
+  theme(legend.position = "bottom") + ylab("Mean neck pain score") +
+  scale_colour_manual(values = c(male = "steelblue", 
+                                 female = "rosybrown"))
+@
+\newslide
+%$
+Surprises:
+\begin{itemize}
+\item Females consistently report higher mean neck pain scores than
+  males. 
+\item \rcode{Comorbidity} seems to affect males more than females.
+\item The effect of \rcode{Group}, ie exercise or not, modelled as
+  a consistent shift, is minuscule, but at least exercise seems to
+  have a slightly beneficial effect.
+\item Fatter people (\rcode{BMI} of 30.12) have a \emph{lower} neck
+  pain score than thinner people (\rcode{BMI} of 22.78), if only very
+  slightly. A first time for everything, it seems!
+\end{itemize}
+
+\newslide
+Notes:
+\begin{itemize}
+  \item This is what the model implies \emph{could} be the case
+  for the mean pain score for the various groups.
+  \item Unfortunately, the effects of any of the fixed effect
+  terms is, in practical terms, almost negligible.
+  \item One feature of the situation not accommodated by the
+  data is the at time~0 no group had received any treatment;
+  allocation to the two groups was random, so there is no
+  reason for their mean pain level, within each group, to be
+  the same for \rcode{Control} and \rcode{Intervention} at 
+  time~0.
+  \item We re-fit a model that uses \rcode{Treat} instead of 
+  \rcode{Time} and \rcode{Group}, and check what the differences 
+  are.
+\end{itemize}
+
+\newslide
+<<mod4>>=
+mod_1s <- update(mod_0s, . ~ . - Time - Group + Treat) %>% step_down
+pNeckPain <- pNeckPain %>% 
+  within({
+    Treat <- ifelse(Time == "T00", "Base", 
+                    paste0(substring(Group, 0, 1),
+                           substring(Time, 2)))
+  })
+pNeckPain$NPainT <- predict(mod_1s, pNeckPain, re.form = ~0)
+ggplot(pNeckPain) + aes(x = Time, y = NPainT, group = Group,
+                        linetype = Group, colour = Sex) + 
+  geom_point() + geom_line() + facet_grid(Sex ~ BMI + Comorbidity) +
+  theme(legend.position = "bottom")  + ylab("Mean neck pain score") +
+  scale_colour_manual(values = c(male = "steelblue", 
+                                 female = "rosybrown"))
+@
+%$
+\newslide
+Cold water:
+\begin{center}
+  \begin{footnotesize}
+<<mod5,results="asis">>=
+dropterm(mod_1s) %>% 
+  booktabs(digits=c(0, 0, 2, 4, 4))
+@     
+  \end{footnotesize}
+\end{center}
+\begin{itemize}
+\item The \rcode{AIC} has gone \emph{up} from
+  \Sexpr{round(extractAIC(mod_0s)[2], 2)} to
+  \Sexpr{round(extractAIC(mod_1s)[2], 2)}, implying this is a less
+  well supported model than the simpler one produced earlier.
+\item The next step would be to explore simpler models than the latest
+  which nevertheless respect the constraint that at time~0 there is,
+  in reality, only one group.  But --- it looks not to be all that
+  useful an enterprise: the effects, however assessed, are tiny.
+\end{itemize}
+\newslide
+\subsection{Neck pain severity}
+
+\begin{itemize}
+\item The researchers were more interested in the \emph{upper tail} of
+  the pain score distribution than the mean.
+  \begin{itemize}
+  \item A pain score less than~3, (strictly), is considered clinically
+    fairly normal.
+  \item A pain score of~3 or more is considered clinically debilitating.
+  \end{itemize}
+  Note that all the fixed effect mean scores coming out of the model,
+  as displayed in out visualisation, were well within the clinically
+  normal region.
+\item We now consider modelling the \emph{probability} that a
+  participant will register a pain score of~3 or more, i.e. within the
+  clinically debilitating range.
+\end{itemize}
+\newslide
+\begin{center}
+  \begin{footnotesize}
+<<bin1,results="asis">>=
+longNeckPain <- within(longNeckPain, {
+  Severe <- (NPain >= 3) + 0 ## coerce logical to binary
+})
+bin_0 <- glmer(Severe ~ Sex*(Time*Group + Age + BMI + Comorbidity +
+                             Ergo + Industry) + (1|Ident), 
+               family = binomial, data = longNeckPain, nAGQ = 0)
+dropterm(bin_0) %>% 
+  booktabs(digits=c(0, 0, 2, 4, 4))
+@     
+  \end{footnotesize}
+\end{center}
+\newslide
+
+The model looks to be grossly over-fitted.  Try an automatic step~down to
+see how things simplify:
+\begin{center}
+  \begin{footnotesize}
+<<bin2,results="asis",cache=TRUE,xx=0>>=
+bin_0s <- step_down(bin_0)
+dropterm(bin_0s) %>% 
+  booktabs(digits=c(0, 0, 2, 4, 4))
+@     
+  \end{footnotesize}
+\end{center}
+\begin{itemize}
+\item A slightly more complicated model, but the same suite of
+  predictors turn up as \emph{possibly} influential.
+\item The significances look even less impressive!
+\item Visualise the implications in the now standard way.
+\end{itemize}
+
+\newslide
+<<bin3>>=
+pNeckPain$pSevere <- predict(bin_0s, pNeckPain,
+                             type = "response", re.form = ~0)
+ggplot(pNeckPain) + aes(x = Time, y = pSevere, group = Group,
+                        linetype = Group, colour = Sex) + 
+  geom_point() + geom_line() + facet_grid(Sex ~ BMI + Comorbidity) +
+  theme(legend.position = "bottom")  + ylab("Pr(severe neck pain)") +
+  scale_colour_manual(values = c(male = "steelblue", 
+                                 female = "rosybrown"))
+@ 
+%$
+\newslide
+Notes:
+
+\begin{itemize}
+\item From our initial visualisation (previous session) we saw that,
+  fortuitously, the \texttt{Intervention} group had a much lower
+  incidence of severe neck pain than the \texttt{Control} group.  This
+  appears to have been seized upon by the modelling process as a real
+  effect. 
+  
+\item Females have higher incidence of severe neck pain, not
+  surprisingly, but there gap between \texttt{Control} and
+  \texttt{Intervention} is much smaller.  \rcode{Time} affects both
+  sexes but for females, nothing else seems to have any effect.
+\end{itemize}
+\newslide
+Now check what results when both groups are forced to have the same
+incidence at time~0:
+\begin{center}
+  \begin{footnotesize}
+<<bin4,results="asis">>=
+bin_1s <- glmer(Severe ~ Sex*(Treat + Comorbidity) + (1|Ident),
+                family = binomial, data = longNeckPain, nAGQ = 0) %>%
+  step_down()
+dropterm(bin_1s, test = "Chisq", sorted = TRUE) %>% 
+  booktabs(digits=c(0, 0, 2, 4, 4))
+pNeckPain$pSevereT <- predict(bin_1s, pNeckPain,
+                              type = "response", re.form = ~0)
+ggplot(pNeckPain) + aes(x = Time, y = pSevereT, group = Group,
+                        linetype = Group, colour = Sex) + ylim(0, 0.3) +
+  geom_point() + geom_line() + facet_grid(Sex ~ Comorbidity) +  ## BMI is gone!
+  theme(legend.position = "bottom")  + ylab("Pr(severe neck pain)") +
+  scale_colour_manual(values = c(male = "steelblue", female = "rosybrown"))
+@     
+%$
+\end{footnotesize}
+\end{center}
+\newslide
+Final comments:
+\begin{itemize}
+\item Always keep in mind these visualisations are of the model, not
+  of the data.  The results generate questions, primarily, not answer
+  them. 
+\item It is interesting that the ultimate models, for mean neck pain
+  and probability of severe neck pain respectively, have similar
+  features to them.  This is suggestive (only!).
+\item This eclectic glimpse of the model building process and
+  visualisation of the results has ignored many important features
+  that you should follow-up upon, in particular:
+  \begin{itemize}
+  \item Look at the variance component estimates: what do you
+    conclude?
+  \item Look at the implications of the model for a much wider
+    range of cases: two \rcode{Comorbidity} coupled with 
+    two \rcode{BMI} values do not cover the field very well.
+  \item Compare the model suggestions with the initial visualisations
+    to see how realistic they might be.
+  \end{itemize}
+\end{itemize}
+
+
+
+
+
+
+\newslide
+\phantomsection
+\addcontentsline{toc}{section}{Session information}
+\section*{Session information}
+\label{sec:sessinfo}
+\begin{tiny}
+
+<<sessionInfo,echo=FALSE,results="asis",out.lines=200>>=
+cat("{\\bf\nDate: ", format(today()), "\n}")
+toLatex(sessionInfo(), locale = FALSE)
+@
+\end{tiny}
+
+
+\end{slide}
+
+\end{document}
+

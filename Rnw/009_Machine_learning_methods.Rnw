@@ -1,0 +1,728 @@
+\documentclass{seminar}
+\usepackage[utf8]{inputenc}
+
+\usepackage{RlogoNew}
+\usepackage{Rcolors}
+
+\usepackage{tabularx}
+\usepackage{SeminarExtra}
+\usepackage{op}
+
+\renewcommand{\hlcom}[1]{\textcolor[rgb]{0.625,0.125,0.9375}{\textsl{#1}}}%
+\renewcommand{\code}[1]{\textsl{\texttt{#1}}}
+\newcommand{\spreadout}{$\vphantom{\big\{}$\xspace}
+
+\DeclareGraphicsExtensions{.pdf,.png,.jpg,.JPG}
+\graphicspath{{Fig/}}
+
+<<"prelim",child="00-Prelim.Rnw">>=
+@
+
+<<setFigPath,include=FALSE>>=
+.infile <- sub("\\.Rnw$", "", knitr::current_input())
+knitr::opts_chunk$set(fig.path = paste0('Fig/', .infile, "_")) #$
+session <- sub("^0+", "", sub("[^[:digit:][:alpha:]].*$", "", .infile))
+@ 
+
+
+\usepackage{natbib}
+\bibliographystyle{chicago}
+
+\title{\Large \input{title.tex}
+  \Huge \red{Session \Sexpr{session}:\\[10pt]
+    Machine Learning\spreadout Approaches}}  %%% Change needed
+
+\input{authorAndDate}
+
+\begin{document}
+\setkeys{Gin}{keepaspectratio=TRUE}
+
+\begin{slide}
+\slidepagestyle{empty}
+
+  {\color{darkgreen}\maketitle}
+\end{slide}
+
+\begin{slide}
+\slidepagestyle{plain}
+\setcounter{slide}{1}
+
+\tableofcontents
+
+\newslide
+<<eng,echo=FALSE>>=
+library(english)
+@
+\section{The Swiss credit card data set}
+\label{sec:credit-card-data}
+
+For this section, we use one data set which we prepare from original
+sources, namely the file \rfile{creditCard.csv}.
+\begin{itemize}
+\item Response: \rcode{credit.card.owner}, binary with levels
+  \rcode{c("no","yes")}.
+\item Predictors: mostly numeric, to do with banking activity.
+  \begin{itemize}
+  \item \rcode{profession} is a sparse factor which we re-group into
+    three densely populated levels (as factor \rcode{pclass}).
+  \item \rcode{nationality} which we re-group into two levels,
+    \rcode{"Swiss"} and \rcode{"Foreigner"}.
+  \item \rcode{sex} is the only other factor.
+  \end{itemize}
+\item Entries have a numerical \rcode{ident} which we zero-fill and
+  move to the \rcode{rownames} rather than have it as a potentially
+  active variable.
+
+\end{itemize}
+\newslide
+Read in the data and
+<<cc1>>=
+library(WWRCourse)
+CCf <- system.file("extdata", "creditCard.csv", package = "WWRCourse")
+CC <- read.csv(CCf, na.strings="", stringsAsFactors = TRUE)
+row.names(CC) <- fill0(CC$ident)
+
+with(CC, c(cases = nrow(CC), known = sum(!is.na(credit.card.owner))))
+@
+
+The data is mostly \emph{unknown}: for building predictive models we
+only have \Sexpr{english(with(CC, sum(!is.na(credit.card.owner))))}
+\emph{at most} from \Sexpr{english(nrow(CC))} cases.
+
+\newslide
+<<cc2>>=
+CC <- CC %>% within({
+  p2 <- c("doctor", "engineer", "lawyer", "professor", "business")
+  p1 <- c("teacher", "police", "service", "chemist", "nurse",
+          "postman", "physical")
+  p0 <- "none"
+  pclass <- rep("", length(profession))
+  pclass[profession %in% p0] <- "p0"
+  pclass[profession %in% p1] <- "p1"
+  pclass[profession %in% p2] <- "p2"
+  pclass <- factor(pclass, levels = paste0("p", 0:2))
+  swiss <- ifelse(nationality == "CH", "Swiss", "Foreigner")
+  sex <- factor(sex)
+  swiss <- factor(swiss)
+  pclass <- factor(pclass)
+  ident <- profession <- nationality <- p0 <- p1 <- p2 <- NULL
+})
+CCKnown <- na.omit(CC)
+dim(CCKnown)
+@
+For model building we have just \Sexpr{english(nrow(CCKnown))} cases and
+\Sexpr{english(ncol(CCKnown)-1)} potential predictors.
+
+For demonstration purposes we split these into \emph{Training} and
+\texttt{Test} data sets.
+
+<<cc3>>=
+set.seed(20200202)    ## for reproducibility
+train <- sample(nrow(CCKnown), nrow(CCKnown)/2)
+
+CCTrain <- CCKnown[train, ]
+CCTest <- CCKnown[-train, ]
+Store(CC, CCKnown, CCTrain, CCTest, train, remove = FALSE)  ## for saftey
+@
+\newslide
+% \subsection{Making compressed text versions}
+% \label{sec:making-compr-text}
+% 
+% It is useful to have available (compressed) text versions of the data
+% sets we can access using \rcode{data(DataSet)}.
+% 
+% <<cc4, eval = FALSE>>=
+% if(!dir.exists("./data")) 
+%   dir.create("./data")
+% con <- gzcon(file("./data/CC.csv.gz", "wb"))
+% write.table(CC, file = con, sep = ";")
+% close(con)
+% con <- gzcon(file("./data/CCKnown.csv.gz", "wb"))
+% write.table(CCKnown, file = con, sep = ";")
+% close(con)
+% con <- gzcon(file("./data/CCTrain.csv.gz", "wb"))
+% write.table(CCTrain, file = con, sep = ";")
+% close(con)
+% con <- gzcon(file("./data/CCTest.csv.gz", "wb"))
+% write.table(CCTest, file = con, sep = ";")
+% close(con)
+% rm(con)
+% @
+% \newslide
+\section{Trees and forests}
+\label{sec:trees-forests}
+
+\begin{itemize}
+\item A technique that developed in machine learning and now widely
+  used in data mining.
+\item The model uses \emph{recursive partitioning} of the data and is
+  a greedy algorithm.
+\item The two main types of tree models are
+  \begin{itemize}
+  \item \emph{\textbf{Regression trees}} --- response is a continuous
+    variable and fitting uses a least squares
+    criterion,
+  \item \textbf{\emph{Classification trees}} --- response is a factor
+    variable and fitting uses an entropy (multinomial
+    likelihood) criterion.
+  \end{itemize}
+
+\newslide
+
+\item Model fitting is easy.  Inference poses more of a dilemma.
+\item The tree structure is very unstable.  \emph{boosting} and
+  \emph{bagging} (random forests) can be useful ways around this.
+\item Two packages for tree models: \rfile{rpart} (which is part of \R
+  itself) and the older \rfile{tree}, \citep{ripley.12}, which has an
+  \Splus flavour and a few advantages for teaching.
+
+  Use \rfile{rpart} in practice.
+
+\end{itemize}
+
+\newslide
+\setkeys{Gin}{width=0.8\textwidth,keepaspectratio=TRUE}
+
+\section{Do you want a credit card?}
+\label{sec:do-you-want}
+
+Our plan is to build predictive models on the \emph{Training} set, and
+use the \emph{Test} set to see how well they fared.  We employ a
+number of techniques, mostly of the ``black box'' kind.
+
+\subsection{An initial tree model}
+\label{sec:an-initial-tree}
+
+<<t3,fig.height=6 * 1.5,fig.width=8 * 1.5,fig.show="hold">>=
+requireData(rpart)
+CCTree <- rpart(credit.card.owner ~ ., CCTrain)
+Store(CCTree, remove = FALSE)
+
+## The first graphic shows the initial fitted tree:
+
+plot(CCTree)
+text(CCTree, xpd = NA)
+
+## The next graphic is to check for the need to prune:
+
+plotcp(CCTree)
+@
+
+
+Pruning is suggested by the ``one standard error'' rule.  Get the pruned tree:
+
+<<t5,fig.height=6 * 1.5,fig.width=8 * 1.5>>=
+oneSERule(CCTree)               ## optimal tuning paramater
+CCPTree <- prune(CCTree, cp = oneSERule(CCTree))
+Store(CCPTree, remove = FALSE)
+
+plot(CCPTree)             ## should have 10 terminal nodes
+text(CCPTree, xpd = NA)
+@
+
+\newslide
+The ``one standard error rule'' function(s) are listed here for
+completeness.  (The coding details are not important for our primary
+purpose here.)
+<<oneSE>>=
+WWRCourse::oneSERule
+methods("oneSERule")
+WWRCourse:::oneSERule.rpart
+@
+\newslide
+
+\subsection{Simple bagging}
+\label{sec:simple-bagging}
+
+``Bootstrap aggregation'' --- invented by Leo Breimann as a device to
+stabilize tree methods and improve their predictive capacity.
+Very much a ``black box'' technique.
+\begin{itemize}
+\item Grow a forest of trees using bootstrap samples of the training data.
+\item For predictions average over the forest:
+  \begin{itemize}
+  \item For classification trees, take a majority vote,
+  \item For regression trees, take an average.
+  \end{itemize}
+\end{itemize}
+
+`Random forests', \citep{liaw02:_class_regres}, is a development of
+bagging with extra protocols imposed.
+
+\newslide
+
+Consider bagging ``by hand''.
+
+<<tbag>>=
+bagRpart <- local({
+  bsample <- function(dataFrame) # bootstrap sampling
+    dataFrame[sample(nrow(dataFrame), rep = TRUE),  ]
+  function(object, data = eval.parent(object$call$data),
+           nBags=200, type = c("standard", "bayesian"), ...) {
+    type <- match.arg(type)
+    bagsFull <- vector("list", nBags)
+    if(type == "standard") {
+      for(j in 1:nBags)
+          bagsFull[[j]] <- update(object, data = bsample(data))
+      } else {
+        nCases <- nrow(data)
+        for(j in 1:nBags)
+            bagsFull[[j]] <- update(object, data = data, weights = rexp(nCases))
+        }
+    class(bagsFull) <- "bagRpart"
+    bagsFull
+  }
+})
+
+## a prediction method for the objects (somewhat tricky!)
+predict.bagRpart <- function(object, newdata, ...) {
+  X <- sapply(object, predict, newdata = newdata, type = "class")
+  candidates <- levels(predict(object[[1]], type = "class"))
+  X <- t(apply(X, 1, function(r) table(factor(r, levels = candidates))))
+  factor(candidates[max.col(X)], levels = candidates)
+}
+Store(bagRpart, lib = .Robjects)
+@
+
+An alternative coding using \rcode{replicate}:
+\newslide
+<<tbagsAlt,eval=FALSE>>=
+bagRpart <- local({
+###
+  bsample <- function(dataFrame) # bootstrap sampling
+    dataFrame[sample(nrow(dataFrame), rep = TRUE),  ]
+###
+  function(object, data = eval.parent(object$call$data),
+           nBags=200, type = c("standard", "bayesian"), ...) {
+    type <- match.arg(type)
+    bagsFull <- if(type == "standard") {
+      replicate(nBags, update(object, data = bsample(data)),
+                simplify = FALSE)
+    } else {
+      nCases <- nrow(data)
+      replicate(nBags,  update(object, data = data, weights = rexp(nCases)),
+                simplify = FALSE)
+    }
+    class(bagsFull) <- "bagRpart"
+    bagsFull
+  }
+})
+@
+
+
+\newslide
+Now for an object or two:
+<<tbag2,cache=TRUE>>=
+set.seed(4321) ## 
+Obj <- update(CCTree, cp = 0.005, minsplit = 9)  ## expand the tree
+(one <- rbind(standard = system.time(CCSBag <- bagRpart(Obj, nBags = 200)),
+              Bayes = system.time(CCBBag <- bagRpart(Obj, nBags = 200,
+                                                     type = "bayes"))))
+Store(CCSBag, CCBBag, remove = FALSE)
+@
+<<include=FALSE>>=
+  if("package:MASS" %in% search()) detach("package:MASS")
+@
+
+\newslide
+
+\subsection{A parallel version}
+\label{sec:parallel}
+
+Some preliminaries first:
+
+<<para1>>=
+## parallel backend; includes other pkgs
+suppressPackageStartupMessages({
+  library(doParallel)
+})
+
+(nc <- detectCores())  ## how many CPUs has your computer?
+
+cl <- makeCluster(nc-1)
+registerDoParallel(cl)
+@ 
+
+\newslide
+A modified version of the fitting function.  Some care needed:
+
+<<para2>>=
+bagRpartParallel <- local({
+  bsample <- function(dataFrame) # bootstrap sampling
+    dataFrame[sample(nrow(dataFrame), rep = TRUE),  ]
+  
+  function(object, data = eval.parent(object$call$data),
+           nBags = 200, type = c("standard", "bayesian"), ...,
+           cores = detectCores() - 1, seed0 = as.numeric(Sys.Date())) {
+    type <- match.arg(type)
+    bagsFull <- foreach(j = idiv(nBags, chunks=cores), seed = seed0+seq(cores),
+                        .combine = c, .packages = c("rpart", "stats"), 
+                        .inorder = FALSE, .export = c("bsample")) %dopar% {
+                          ## now inside a single core
+                          set.seed(seed = seed)
+                          if(type == "standard") {
+                            replicate(j, simplify = FALSE, 
+                                      update(object, data = bsample(data)))  
+                          } else {
+                            replicate(j, simplify = FALSE,
+                                      update(object, data = data,
+                                             weights = rexp(nrow(data))))
+                          }
+                          ## end of single core mode
+                        }
+    class(bagsFull) <- "bagRpart"
+    bagsFull
+  }
+})
+@ 
+
+A timing comparison
+
+<<para3,cache=TRUE>>=
+Obj <- update(CCTree, cp = 0.005, minsplit = 9)  ## expand the tree
+rbind(one,
+      standardP = system.time(CCSBagP <- bagRpartParallel(Obj, nBags = 200)),
+      BayesP = system.time(CCBBagP    <- bagRpartParallel(Obj, nBags = 200, 
+                                                          type = "bayes")))
+rm(Obj, one)
+Store(CCSBagP, CCBBagP, remove = FALSE)
+@ 
+<<include=FALSE>>=
+  if("package:MASS" %in% search()) detach("package:MASS")
+@
+
+<<line_377_, include=FALSE>>=
+stopCluster(cl)  ## release resources
+rm(cl)
+@
+
+\newslide
+\subsection{The actual random forest}
+\label{sec:actual-random-forest}
+
+The random forest package, \citep{liaw02:_class_regres}, implements
+this technology, and more, automatically.  The number of trees is set
+to 500 by default.  How many times does each observation get sampled
+if we restrict it to 200 trees?
+
+<<trf1>>=
+n <- nrow(CCTrain)
+X <- replicate(200,
+       table(factor(sample(n, rep=TRUE), levels = 1:n)))
+(lims <- range(rowSums(X > 0)))
+rm(n, X)
+@
+So in this simulation the cases were sampled between \Sexpr{english(lims[1])}
+and \Sexpr{english(lims[2])} times.  This seems about enough.
+
+\newslide
+We now fit the random forest.
+
+<<trf2>>=
+requireData(randomForest)
+(CCRf <- randomForest(credit.card.owner ~ ., CCTrain, ntree = 200))
+Store(CCRf, remove = FALSE)
+@
+% \newslide
+
+<<oob,include=FALSE>>=
+OOB <- function(obj, ...) UseMethod("OOB")
+OOB.default <- function(obj, ...)
+    stop(sprintf("No OOB method for objects of class %s currently exists.",
+                 dQuote(class(obj))))
+OOB.randomForest <- function(obj, ...)
+    with(obj, {
+      here <- with(sys.status(), max(sys.parents))
+      if(type == "classification" && exists("confusion", frame = here))
+          err.rate[ntree, "OOB"] else NA
+    })
+# Store(OOB, OOB.default, OOB.randomForest, lib = .Robjects)
+@
+The ``out of bag'' (OOB) error rate is estimated as
+\Sexpr{round(OOB(CCRf), 4)*100}\%.  We check later how this compares
+with the observed error rate in the reserved \emph{Test} data.
+
+\newslide
+
+\subsection{Progressive error rate}
+\label{sec:progr-error-rate}
+
+The random forest technology keeps a tally of the OOB error rate as
+the forest grows.
+\begin{center}
+<<err>>=
+err <- as.data.frame(CCRf$err.rate) %>% 
+  rownames_to_column("trees") %>% 
+  mutate(trees = as.numeric(trees)) %>% 
+  pivot_longer(cols = -trees, names_to = "Which", values_to = "Error")
+ggplot(err) + aes(x = trees, y = Error, colour = Which) + geom_line() +
+  scale_colour_brewer(palette = "Dark2", name = "Which one:") +
+  ylim(0, max(err$Error)*1.05) + labs(title = "Credit Card - Training Data")  +
+  guides(colour = guide_legend(ncol = 3)) +
+  theme_bw() + theme(legend.position = c(0, 0)+0.01,
+                     legend.justification = c("left", "bottom"),
+                     plot.title = element_text(hjust = 0.5, face = "bold"))
+@
+\end{center}
+We can do this more directly with the \rcode{plot} method for random forest objects.  As
+is our custom, we add a few little aesthetic enhancements:
+\begin{center}
+<<rfplot, eval=FALSE>>=
+ER <- CCRf$err.rate
+plot(CCRf, ylim = range(0, ER)*1.05, lty = "solid", las = 1,
+     panel.first = grid(lty = "dashed"), main = "Credit Card - Training Data")  
+legend("bottomleft", colnames(ER), ncol = ncol(ER), bg = "white",
+       col = 1:3, lty = "solid", bty = "o", box.col = "transparent",
+       title = "Which one:")
+@
+
+<<echo=FALSE>>=
+pal <- palette()
+pal[3] <- "dark green"
+palette(pal)
+<<rfplot>>
+@
+
+\end{center}
+
+
+\newslide
+\subsection{Variable importances}
+\label{sec:variable-importances}
+
+One other nice by-product is variable importances.
+\begin{center}
+<<trf3>>=
+par(family="sans")
+varImpPlot(CCRf, pch = 20, col = "navy")  ## causes a plot
+(v <- sort(drop(importance(CCRf)), decreasing = TRUE))[1:6]
+best_few <- names(v)[1:20] %>% print ## used later
+@
+\end{center}
+\newslide
+\subsubsection{Partial plots for predictor variables}
+\label{sec:partialPlot}
+These look at the way predictors appear to influence the response, \emph{mutatis mutandis}.
+
+<<trfpp>>=
+partialPlot(CCRf, pred.data = CCTrain, x.var = best_few[1], xlab = best_few[1])
+@
+
+
+
+\newslide
+
+\subsection{Parametric models}
+\label{sec:parametric-models}
+
+Tree models and random forests are natural competitors to the standard
+parametric models, notably GLMs.  We begin with a naive model based
+only on what appear good variables in the random forest, and then
+consider other modest versions, but automatically produced.
+
+<<glm0>>=
+(form <- as.formula(paste("credit.card.owner~",
+                         paste(best_few, collapse="+"))))
+
+Call <- substitute(glm(FORM, binomial, CCTrain), list(FORM = form))
+CCGlmNaive <- eval(Call)
+Store(CCGlmNaive, remove = FALSE)
+
+@
+<<g1,cache=TRUE>>=
+
+upp <- paste("~", paste(setdiff(names(CCTrain),
+                                "credit.card.owner"),
+                        collapse="+")) %>% 
+  as.formula()
+scope <- list(upper=upp, lower=~1)
+CCGlmAIC <- step_AIC(CCGlmNaive, scope = scope)
+CCGlmGIC <- step_GIC(CCGlmNaive, scope = scope)
+CCGlmBIC <- step_BIC(CCGlmNaive, scope = scope)
+Store(CCGlmAIC, CCGlmBIC, form, upp, remove = FALSE)
+@
+<<include=FALSE>>=
+  if("package:MASS" %in% search()) detach("package:MASS")
+@
+
+\newslide
+
+\subsection{Boosting other models}
+\label{sec:boost-other-models}
+
+The \rcode{mboost} package is an implementation of the boosting idea
+for a suite of different models.  It is described in
+\citet{buehlmann07:_boost_algor}.  We consider two different kinds of
+boosted models, namely a boosted GLM and a boosted TREE version.
+
+The package is profligate in the number of others it requires!
+<<line_511_,include=FALSE>>=
+form <- as.formula(paste("credit.card.owner~",
+                         paste(best_few, collapse="+")))
+@ 
+<<boost,cache=TRUE>>=
+requireData(mboost)
+Call <- substitute(glmboost(FORM, data = CCTrain, family=Binomial()),
+                   list(FORM = form))  ## same as naive model
+CCglmboost <- eval(Call)
+
+  ## more packages needed!
+CCblackboost <- blackboost(credit.card.owner ~ ., CCTrain, 
+                           family = Binomial())
+Store(CCglmboost, CCblackboost, remove = FALSE)
+@
+
+
+\newslide
+\subsection{Weird science: C5.0}
+\label{sec:weird-science:-c5.0}
+\vspace{-10pt}
+This is a development of a previously proprietary algorithm of
+\citet{quinlan93:_c4,c50_2020}.  It yields a rule-based classifier that might
+be considered intermediate between trees and forests.
+
+<<quin>>=
+requireData(C50)  ## NB C-5-Zero
+(CCc50 <- C5.0(credit.card.owner ~ ., CCTrain))
+Store(CCc50)
+@
+\newslide
+The \rfile{C50} package, like \rfile{randomForest}, has some tools that allow the
+fitted model object to be investigated.
+
+These include tools to assess \emph{variable importance}, where the measure itself 
+is somewhat obscure, but it expressed as a percentage.
+
+<<quin2,fig.show="hold">>=
+obj <- C5imp(CCc50)
+data.frame(importance = obj$Overall, variable = rownames(obj)) %>% 
+  filter(importance > 0) %>% 
+  arrange(importance) %>% 
+  with(., dotchart(importance, as.character(variable), pch = 20, col = "navy"))
+rm(obj)
+@
+
+
+\newslide
+\subsection{Gradient boosting models, GBM}
+
+Like \rfile{C5.0} this method was proprietary but for
+some time now there has been an \R implementation by Greg Ridgeway, 
+\citep{ridgeway_2020}.
+
+It offers a powerful machine learning method for several classes of models,
+including `bernoulli' (binary data, but \textbf{not} multinomial,
+unlike \rfile{randomForest} or even \rfile{C5.0}.)
+
+Bernoulli models need to be fitted with a numeric
+response confined to the values $\{0, 1\}$, which can be a bit awkward:
+
+<<>>=
+suppressPackageStartupMessages(library(gbm))
+(CCgbm <- gbm(ifelse(credit.card.owner == "no", 0, 1) ~ ., data = CCKnown, 
+              distribution = "bernoulli", n.trees = 200, cv.folds = 10))
+@
+\newslide
+There are several useful tools for investigating the fit and efficacy of a GBM.  The
+first of these is one for looking at the relative influence of the predictors:
+<<out.lines = 15>>=
+summary(CCgbm, plotit = FALSE) %>% filter(rel.inf > 0)
+@
+But wait, there's more.  You can get a \rcode{barplot} of the result using same function
+<<out.height="75%">>=
+par(mar = c(4,12,1,1), cex = 0.7)
+tmp <- summary(CCgbm)  ## tmp is now the data frame displayed above.
+@
+\newslide
+Partial dependency plots are also available.  
+
+Look at the four ``most influential'' variables
+
+<<>>=
+suppressPackageStartupMessages({
+  library(gridExtra)
+})
+(vars <- tmp$var[1:4])                   ## four "most influential" variables
+plots <- lapply(vars, . %>% plot(CCgbm, i.var = ., type = "response"))
+grobs <- arrangeGrob(grobs = plots, layout_matrix = rbind(1:2, 3:4))
+plot(grobs)
+@
+
+
+
+\newslide
+\section{The final reckoning}
+\label{sec:final-reckoning}
+
+Now to see how things worked out this time.  First a helper function
+
+<<Class>>=
+Class <- function(object, newdata, ...)
+    UseMethod("Class")
+
+Class.rpart <- function(object, newdata, ...)
+    predict(object, newdata, type = "class")
+
+Class.bagRpart <- function(object, newdata, ...)
+    predict(object, newdata)
+
+Class.randomForest <- Class.C5.0 <- predict
+
+Class.glm <- Class.mboost <- Class.gbm <- function(object, newdata, ...) {
+  ## only applies for binomial GLMs with symmetric links
+  suppressMessages(predict(object, newdata) > 0)
+}
+@
+\newslide
+The helper function \rcode{Class} streamlines things a bit:
+<<line_583_,echo=FALSE>>=
+SOAR::Attach()
+@
+
+<<errors>>=
+errorRate <- function(tab) 100*(1 - sum(diag(tab))/sum(tab))
+true <- CCTest$credit.card.owner  #$
+(res <- sort(sapply(list(Tree = CCTree,            PrunedTree = CCPTree,
+                         SimpleBagging = CCSBag,   BayesBagging = CCBBag,
+                         SimpleBaggingP = CCSBagP, BayesBaggingP = CCBBagP,
+                         RandomForest = CCRf,      C5.0 = CCc50, 
+                         GradientBoosting = CCgbm, BoostedGlm = CCglmboost,
+                         NaiveGLM = CCGlmNaive,    BoostedTree = CCblackboost, 
+                         Glm_AIC = CCGlmAIC,       GlmGIC = CCGlmGIC, 
+                         Glm_BIC = CCGlmBIC),
+                    function(x) errorRate(table(Class(x, CCTest), true)))))
+@
+\newslide
+\begin{center}
+<<err2,out.height="80%">>=
+par(mar = c(3,8,3,1))
+barplot(rev(res), horiz=TRUE, las=1, fill = pal_green2brown)
+axis(3)
+@
+\end{center}
+
+\newslide
+% \clearpage
+\phantomsection
+\addcontentsline{toc}{section}{References}
+% \nocite{venables02:_moder_applied_statis_s}
+\bibliography{refs}
+
+\newslide
+\phantomsection
+\addcontentsline{toc}{section}{Session information}
+\section*{Session information}
+\label{sec:sessinfo}
+\vspace{-10pt}
+\begin{tiny}
+<<sessionInfo,echo=FALSE,results="asis",out.lines=200>>=
+cat("{\\bf\nDate: ", format(today()), "\n}")
+toLatex(sessionInfo(), locale = FALSE)
+@ 
+\end{tiny}
+
+
+\end{slide}
+
+\end{document}
+

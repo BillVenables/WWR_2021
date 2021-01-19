@@ -1,0 +1,127 @@
+\documentclass{seminar}
+\usepackage[utf8]{inputenc}
+
+\usepackage{Rlogo}
+\usepackage{Rcolors}
+
+\usepackage{tabularx}
+\usepackage{SeminarExtra}
+\usepackage{op}
+
+\renewcommand{\hlcom}[1]{\textcolor[rgb]{0.625,0.125,0.9375}{\textsl{#1}}}%
+
+\DeclareGraphicsExtensions{.pdf,.png,.jpg,.JPG}
+\graphicspath{{Fig/}}
+
+<<"prelim",child="00-Prelim.Rnw">>=
+@
+
+<<setFigPath,include=FALSE>>=
+.infile <- sub("\\.Rnw$", "", knitr::current_input())
+knitr::opts_chunk$set(fig.path = paste0('Fig/', .infile, "_")) #$
+session <- sub("^0+", "", sub("[^[:digit:][:alpha:]].*$", "", .infile))
+@
+
+
+\usepackage{natbib}
+\bibliographystyle{chicago}
+
+\title{\Large \input{title.tex}
+  \Huge \red{Session \Sexpr{session}:\\[10pt]
+    Using \texttt{Rcpp} in Documents: A Demo}}  %%% Change needed
+
+\input{authorAndDate}
+
+\begin{document}
+\setkeys{Gin}{keepaspectratio=TRUE}
+
+\begin{slide}
+\slidepagestyle{empty}
+
+  {\color{darkgreen}\maketitle}
+\end{slide}
+
+\begin{slide}
+\slidepagestyle{plain}
+\setcounter{slide}{1}
+
+\tableofcontents
+
+\newslide
+
+\section{Introduction}
+\label{sec:intro}
+
+This is the leading text.  Next I want to have avialable an Rcpp function
+to use for rapid computations.
+
+Here is the code:
+<<"test",engine="Rcpp">>=
+#include <Rcpp.h>
+using namespace Rcpp;
+
+// [[Rcpp::export]]
+NumericVector convolve(NumericVector a, NumericVector b) {
+  int na = a.size(), nb = b.size(), nab = na + nb -1;
+  NumericVector ab(nab);
+
+  for(int i = 0; i < na; i++) {
+    for(int j = 0; j < nb; j++) {
+      ab[i+j] += a[i]*b[j];
+    }
+  }
+  return ab;
+}
+@
+
+Here is a comparison function in pure \R:
+<<line_070_>>=
+#' Title
+#'
+#' @param a
+#' @param b
+#'
+#' @return
+#' @export
+#'
+#' @examples
+convolveR <- function(a, b) {
+  na <- length(a)
+  nb <- length(b)
+  ab <- numeric(na + nb - 1)
+  for(i in 1:na) {
+    for(j in 1:nb) {
+      ab[i + j -1] <- ab[i + j -1] + a[i]*b[j]
+    }
+  }
+  ab
+}
+@
+
+<<line_093_>>=
+library(rbenchmark)
+a <- rnorm(5000)
+b <- c(1,4,6,4,1)/16
+identical(convolve(a, b), convolveR(a, b))
+benchmark(convolve(a, b), convolveR(a, b))[,c(1,3:4)]
+@
+
+\newslide
+\phantomsection
+\addcontentsline{toc}{section}{Session information}
+\section*{Session information}
+\label{sec:sessinfo}
+
+\begin{tiny}
+<<sessionInfo,echo=FALSE,results="asis",out.lines=200>>=
+cat("{\\bf\nDate: ", format(Sys.Date()), "\n}")
+toLatex(sessionInfo())
+@ %def
+\end{tiny}
+
+
+
+\end{slide}
+
+\end{document}
+

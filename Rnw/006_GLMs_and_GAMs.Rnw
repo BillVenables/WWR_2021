@@ -1,0 +1,719 @@
+\documentclass{seminar}
+\usepackage[utf8]{inputenc}
+
+\usepackage{RlogoNew}
+\usepackage{Rcolors}
+
+\usepackage{tabularx}
+\usepackage{SeminarExtra}
+\usepackage{op}
+
+\renewcommand{\hlcom}[1]{\textcolor[rgb]{0.625,0.125,0.9375}{\textsl{#1}}}%
+\renewcommand{\code}[1]{\textsl{\texttt{#1}}}
+\newcommand{\spreadout}{$\vphantom{\big\{}$\xspace}
+
+\DeclareGraphicsExtensions{.pdf,.png,.jpg,.JPG}
+\graphicspath{{Fig/}}
+
+<<"prelim",child="00-Prelim.Rnw">>=
+@
+
+<<setFigPath,include=FALSE>>=
+.infile <- sub("\\.Rnw$", "", knitr::current_input())
+knitr::opts_chunk$set(
+  fig.path = paste0('Fig/', .infile, "_"),
+  message = FALSE,
+  warning = FALSE) #$
+session <- sub("^0+", "", sub("[^[:digit:][:alpha:]].*$", "", .infile))
+@ 
+
+
+\usepackage{natbib}
+\bibliographystyle{chicago}
+
+\title{\Large \input{title.tex}
+  \Huge \red{Session \Sexpr{session}:\\
+    Generalized Linear and \spreadout  
+    Generalized Additive \spreadout Models}}  %%% Change needed
+
+\input{authorAndDate}
+
+\begin{document}
+\setkeys{Gin}{keepaspectratio=TRUE}
+
+\begin{slide}
+\slidepagestyle{empty}
+
+  {\color{darkgreen}\maketitle}
+\end{slide}
+
+\begin{slide}
+\slidepagestyle{plain}
+\setcounter{slide}{1}
+
+\tableofcontents
+\vspace{0.25cm}
+\centerline{\includegraphics[width=0.8\textwidth,keepaspectratio=TRUE]{Bazas_courting}}
+
+\newslide
+
+\section{An example from \rfile{MASS}: low birth weight}
+\label{sec:an-example-from}
+
+From \citet[Chap.~7]{venables02:_moder_applied_statis_s}, taken
+from an original in \citet{hosmer.lemeshow:applied}.
+\begin{description}
+\item[\rcode{low}] indicator of birth weight less than 2.5 kg.
+
+\item[\rcode{age}] mother's age in years.
+
+\item[\rcode{lwt}] mother's weight in pounds at last menstrual period.
+
+\item[\rcode{race}] mother's race ('1' = white, '2' = black, '3' = other).
+
+\item[\rcode{smoke}] smoking status during pregnancy.
+
+\item[\rcode{ptl}] number of previous premature labours.
+
+\item[\rcode{ht}] history of hypertension.
+
+\item[\rcode{ui}] presence of uterine irritability.
+
+\item[\rcode{ftv}] number of physician visits during the first trimester.
+
+\item[\rcode{bwt}] birth weight in grams.
+
+\end{description}
+
+\newslide
+The original \rfile{MASS} code:
+<<c1aa,eval=TRUE,size="tiny">>=
+attach(birthwt)
+race <- factor(race, labels = c("white", "black", "other"))
+table(ptl)
+ptd <- factor(ptl > 0)
+table(ftv)
+ftv <- factor(ftv)
+levels(ftv)[-(1:2)] <- "2+"
+table(ftv)  # as a check
+bwt <- data.frame(low = factor(low), age, lwt, race,
+   smoke = (smoke > 0), ptd, ht = (ht > 0), ui = (ui > 0), ftv)
+detach(); rm(race, ptd, ftv)
+@
+\newslide
+My preference now:
+<<c2aa,cache=FALSE>>=
+BirthWt <- birthwt %>% 
+  within({
+    low <-   case_when(low == 0 ~ "Normal",
+                       low == 1 ~ "Low") %>% factor() ## why? why factor??
+    race <-  case_when(race == 1 ~ "White",
+                       race == 2 ~ "Black",
+                       race == 3 ~ "Other")
+    smoke <- ifelse(smoke > 0, "Some", "None")
+    ptl <-   ifelse(ptl > 0, "1+", "0")
+    ht <-    ifelse(ht > 0, "Yes", "No")
+    ui <-    ifelse(ui > 0, "Yes", "No")
+    ftv <-   ifelse(ftv > 1, "2+", ftv)  ## change numeric -> character
+  }) %>% 
+  select(-bwt)  ## not useful for modelling.
+Store(BirthWt)
+head(BirthWt, 2)
+@
+<<include=FALSE>>=
+if("package:MASS" %in% search()) detach("package:MASS")
+@
+
+\newslide
+
+Advice from the \rfile{fortunes} package:
+\begin{center}
+\begin{minipage}{0.9\linewidth}\sl
+  If I were to be treated by a cure created by stepwise regression, I
+  would prefer voodoo.
+
+\hfill--- \parbox[t]{0.85\linewidth}{\emph{Dieter Menne}
+  (in a thread about regressions with many variables)
+  R-help (October 2009)}
+\end{minipage}
+
+\end{center}
+\begin{itemize}
+\item Automated screening is more defensible in cases of pure
+  prediction.
+\item Automated screening is dangerous if used for inference.
+
+\end{itemize}
+
+\red{\emph{Caveat emptor!}}
+
+To start things off:
+<<turnoff>>=
+options(show.signif.stars = FALSE)
+ls("package:WWRUtilities", pattern = "^(step|drop)") %>% noquote()
+@
+
+\newslide
+
+\subsection{Automated screening of variables}
+\label{sec:autom-scre-vari}
+
+A starting point, main effects only:
+<<c1>>=
+BW0 <- glm(low ~ ., binomial, BirthWt)
+dropterm(BW0)
+@
+
+Screen for possible interactions:
+<<c2>>=
+sBW0 <- step_AIC(BW0, scope = list(
+  lower = ~1, 
+  upper = ~.^2+poly(age, 2)+poly(lwt,2)))
+dropterm(sBW0)
+@
+
+\newslide
+
+\subsection{An extended model with smooth terms}
+\label{sec:an-extended-model}
+
+We consider some flexibility in the \rcode{age} term and its
+interaction with \rcode{ftv}.
+
+<<c3,cache=FALSE, message=TRUE>>=
+suppressPackageStartupMessages(library(mgcv))
+BW1 <- bam(low ~ smoke*ui + ht + s(lwt) + ptl + s(age) +
+           poly(age, 2)*ftv, family = binomial, data = BirthWt, 
+           control = gam.control(trace = TRUE))
+BW1 <- update(BW1, control = gam.control(trace = FALSE))  ## turn off tracing
+@
+<<include=FALSE>>=
+if("package:MASS" %in% search()) detach("package:MASS")
+@
+
+\begin{figure}
+<<c3a,eval=FALSE>>=
+anova(BW1)
+@
+\vspace{-8pt}
+<<c3b,echo=FALSE>>=
+txt <- capture.output(anova(BW1))
+txt <- txt[nchar(txt) > 0]
+cat(txt, sep="\n")
+rm(txt)
+@
+\end{figure}
+
+\newslide
+
+
+\subsection{Looking at the terms}
+\label{sec:looking-at-terms}
+
+We will first do a visualisation "by hand" and follow up with
+a packaged tool: \rcode{visreg::visreg}
+
+\subsection{A helper function: the most frequent value}
+\label{sec:help-funct-most}
+
+<<mfv>>=
+mostFreq <- function(x, ...) {
+  UseMethod("mostFreq")
+}
+
+mostFreq.logical <- function(x, ...) {
+  tx <- as.vector(table(x))
+  tx[2] > tx[1]
+}
+
+mostFreq.character <- function(x, ...) {
+  tx <- table(x)
+  names(tx)[which.max(tx)]
+}
+
+mostFreq.factor <- function(x, ...)
+    mostFreq.character(as.character(x))
+
+mostFreq.numeric <- stats::median.default  ## check argument names
+                                           ## covers class 'integer' as well  
+# Store(list = ls(pattern = "^mostFreq"), lib = .Robjects)
+@
+
+\newslide
+\subsection{The main two-way interaction}
+\label{sec:main-two-way}
+
+Predict the probability of low birth weight with varying \rcode{age}
+and \rcode{ftv}, and other variables at or near their modal value.
+
+<<c6>>=
+all.vars(formula(BW1))
+pBirthWt <- with(BirthWt,
+    expand.grid(smoke = mostFreq(smoke), 
+                ui = mostFreq(ui),
+                ht = mostFreq(ht), 
+                lwt = mostFreq(lwt),
+                ptl = mostFreq(ptl), 
+                age = min(age):max(age),   ## first branch
+                ftv = sort(unique(ftv))))  ## second branch 
+pBirthWt$pBW1 <- predict(BW1, pBirthWt, type = "response")
+p0 <- ggplot(pBirthWt) + aes(x = age, y = pBW1) +
+  geom_line() + ylim(0,1) + ylab("Pr(low birth weight)") + 
+  facet_grid(. ~ ftv)
+@
+
+\newslide 
+
+To bring the predictions closer to the actual \emph{data}, confine the
+predictions to \rcode{age} ranges that apply within the levels of \rcode{ftv}
+<<c6a>>=
+pBirthWt <- within(pBirthWt, {
+    rngs <- do.call(cbind, with(BirthWt, tapply(age, ftv, range)))
+    pBW1a <- pBW1
+    is.na(pBW1a[age < rngs[1, ftv] | age > rngs[2, ftv]]) <- TRUE
+    rm(rngs)
+})
+p1 <- ggplot(na.omit(pBirthWt)) + aes(x = age, y = pBW1a) +
+    geom_line() + ylim(0,1) + # theme_bw() +
+    ylab("Pr(low birth weight)") + facet_grid(. ~ ftv)
+
+# gridExtra::grid.arrange(p0, p1, nrow=2)
+p0/p1
+@
+
+\newslide
+\subsection{The \rcode{visreg} alternative}
+\label{sub:The visreg alternative}
+
+This is a more recent package, which offers some advantages and offers
+some traps.
+<<line_302_,fig.height=10,fig.width=12>>=
+library(visreg)
+p0 <- visreg(BW1, xvar = "age", by = "ftv", scale = "resp", ylim = 0:1, plot = FALSE)
+p1 <- visreg(BW1, xvar = "smoke", by = "ui", scale = "resp", ylim = 0:1, plot = FALSE)
+plot(p0, gg = TRUE)/plot(p1, gg = TRUE)
+@
+\newslide
+\section{The ``churn" example}
+\label{sec:The churn example}
+
+This example has already been introduced.
+<<line_312_>>=
+fname <- system.file("extdata", "churnData.csv.gz", package = "WWRCourse")
+churnData <- read_csv(gzfile(fname),     ## neater read (for eventual notebook)
+                      col_types = cols(.default = col_double(),
+                                       state = col_character(),
+                                       area_code = col_character(),
+                                       international_plan = col_character(),
+                                       voice_mail_plan = col_character(),
+                                       churn = col_character(),
+                                       sample = col_character())) %>% 
+  within({
+    area_code <- sub("^area_code_", "", area_code) %>% factor()
+    churn <- (churn == "no") + 0      ## replace by a binary response
+  }) %>% 
+  untibble()
+names(churnData) <- sub("^(total|number)_", "", names(churnData)) ## neater
+@
+\newslide
+Split into training and test samples, as directed, and remove variables known
+to be irrelevant or redundant (in a linear models sense).
+<<line_332_,out.lines=8>>=
+names(churnData) %>% noquote()
+churn_train <- churnData %>% 
+  filter(sample == "train") %>% 
+  select(-sample, -ends_with("charge"))
+churn_test  <- churnData %>% 
+  filter(sample == "test" ) %>% 
+  select(-sample, -ends_with("charge"))
+@
+\newslide
+Two modelling construction paradigms:  AIC and BIC
+<<line_343_,cache=FALSE>>=
+churnAIC <- glm(churn ~ ., binomial, churn_train) %>% 
+  step_AIC(scope = list(lower = ~state))
+churnBIC <- glm(churn ~ ., binomial, churn_train) %>% 
+  step_BIC(scope = list(lower = ~state))
+@
+<<include=FALSE>>=
+if("package:MASS" %in% search()) detach("package:MASS")
+@
+
+\newslide
+Look at what terms remain:
+\begin{center}\footnotesize
+<<line_352_,eval=FALSE>>=
+dropterm(churnAIC) %>% booktabs(digits = c(0,0,2,2,2,6))
+@
+<<l375,results="asis",echo=FALSE>>=
+<<line_352_>>
+@
+
+\end{center}
+\newslide
+\begin{center}\footnotesize
+<<line_358_,eval=FALSE>>=
+dropterm(churnBIC) %>% booktabs(digits = c(0,0,2,2,2,6))
+@
+<<l385,echo=FALSE,results="asis">>=
+<<line_358_>>
+@
+
+\end{center}
+\newslide
+See how well each perform on the test data:
+<<line_364_>>=
+(confAIC <- table(actual = churn_test$churn, 
+                  predicted = (predict(churnAIC, churn_test) > 0) + 0))
+(confBIC <- table(actual = churn_test$churn, 
+                  predicted = (predict(churnBIC, churn_test) > 0) + 0))
+@
+The (crude) error rates are:
+<<line_371_>>=
+c(AIC = (1 - sum(diag(confAIC))/sum(confAIC))*100,
+  BIC = (1 - sum(diag(confBIC))/sum(confBIC))*100) %>% round(2)
+@
+<<>>=
+
+@
+
+
+
+
+\newslide
+
+\section{Tiger prawn species split}
+\label{sec:more-extens-exampl}
+
+The Northern Prawn Fishery: Tiger prawn effort and ``the blue line''
+
+<<d1,echo=FALSE,out.height="2.25in">>=
+Attach(lib = .Robjects)
+pal <- colorRampPalette(c("white","lemonchiffon","orange","red"))
+
+NPF0(col = grey(0.95))
+ncols <- with(teff, 1 + ceiling(log(1 + TigerE)))
+cols <- pal(max(ncols))[ncols]
+
+points(Latitude ~ Longitude, teff, pch = 15, cex = 0.5, col=cols)
+lines(ShortCC, col="blue", lwd=3)
+lines(Oz)
+@
+
+
+\newslide
+
+Background
+
+\begin{itemize}
+\item Two species of Tiger prawns are caught together.
+\item Both species require separate Stock Assessment.
+\item The assessment model requires catches of Tiger prawns to be
+  split (by weight)
+\item Problem:  Build a model for partitioning catches into the two
+  component species.
+\item Data: independent surveys (12 in all) where catches have been
+  split into the two species, \emph{Penaeus semisulcatus} (Grooved)
+  and \emph{P. esculentus} (Brown).
+\item Both species have annual offshore migration patterns.
+\end{itemize}
+
+\newslide
+
+Variables available:
+
+\begin{itemize}
+\item Response: \rcode{Psem}, \rcode{Pesc}, (\rcode{Total} =
+  \rcode{Psem} + \rcode{Pesc}) in gms;
+
+  Predictors:
+\item \rcode{Longitude}, \rcode{Latitude} -- of trawl shot;
+\item \rcode{Coast}, \rcode{Sea} -- alternative spatial coordinates;
+\item \rcode{Depth} -- of trawl shot;
+\item \rcode{Mud} -- the \% mud in the substrate;
+\item \rcode{DayOfYear} -- to allow for annual migration periodicity;
+\item \rcode{ElapsedDays} -- days since 1970-01-01, for long term trend
+\item \rcode{Survey} -- used for a random effect extension.
+\end{itemize}
+
+\newslide
+
+Strategy:
+\begin{itemize}
+\item Build a simpler GLM using mainly splines, with a term in
+  \rcode{DayOfYear} and \rcode{Sea} to allow for temporal (annual
+  migration) effects.
+\item Develop a more sophisticated GAM to take advantage of more
+  recent modelling technology
+\item Look at a long-term trend term as a perturbation to the model
+\item Consider GLMMs with random terms for \rcode{Survey}, eventually
+\end{itemize}
+
+\newslide
+Model terms, GLM:
+\begin{itemize}
+\item Spline in \rcode{Coast} surrogate for large-scale benthic changes,
+\item Splines in \rcode{Sea}, \rcode{Depth} and \rcode{Mud} -- more
+  local spatial effects,
+\item Periodic term in \rcode{DayOfYear} and its interaction with
+  \rcode{Sea} -- annual migration effects,
+\item Spline in \rcode{ElapsedDays} -- testing for long-term stability.
+\end{itemize}
+
+\newslide
+
+\subsection{An initial GLM}
+\label{sec:an-initial-glm}
+
+The GLM fitting process for such models can be slow to converge under
+the normal algorithm.  Two possible alternatives:
+\begin{itemize}
+\item Use the \rfile{glm2} library, which has a modified convergence
+  process, \citep{RJournal:2011-2:Marschner}.
+
+\item In this case the problem is with the variable weights needed.
+  Only the \emph{relative} weights are used with \texttt{quasi}
+  models.  It can be an advantage to \emph{scale} the weights so that,
+  on average, they are about unity.
+\end{itemize}
+
+\newslide
+
+The periodic terms will use Fourier polynomials:
+
+<<d2>>=
+Annual <- function (day, k = 4) {  ## day of the year, starting from 0
+  theta <- Arg(complex(argument = 2*base::pi*day/364.25))
+  X <- matrix(0, length(theta), 2 * k)
+  nam <- as.vector(outer(c("c", "s"), 1:k, paste, sep = ""))
+  dimnames(X) <- list(names(day), nam)
+  m <- 0
+  for (j in 1:k) {
+    X[, (m <- m + 1)] <- cos(j * theta)
+    X[, (m <- m + 1)] <- sin(j * theta)
+  }
+  X
+}
+Store(Annual,Tigers, lib = .Robjects)
+@
+
+\newslide
+\null\vspace{-20pt}
+<<d3,cache=FALSE,.k=1,message=TRUE>>=
+TModelGLM <- glm(Psem/Total ~ ns(Coast, 10) +
+                   ns(Sea, 5) + 
+                   ns(Depth, 5) +
+                   ns(Mud, 4) + 
+                   Annual(DayOfYear, 4)*Sea, 
+                 family = quasibinomial,
+                 data = Tigers, weights = Total/mean(Total), 
+                 trace = TRUE)
+TModelGLM$call$trace <- NULL  ## for future updating
+Store(TModelGLM, lib = .Robjects)
+# (nam <- names(model.frame(TModelGLM)))  ## for term plotting
+# nam <- nam[2:7]                         ## terms to plot
+@
+<<include=FALSE>>=
+if("package:MASS" %in% search()) detach("package:MASS")
+@
+
+\newslide
+
+Look at the shape of the main effect terms, to see implications:
+
+<<d4,out.height="45%",fig.width=10,fig.height=5,fig.show="hold">>=
+# layout(matrix(1:6, 2, 3, byrow=TRUE))   ## 2 x 3 array of plots
+# termplot(TModelGLM, terms = nam, se = TRUE, rug=TRUE,
+#          ylim = c(-5, 5))
+# layout(1)
+visreg(TModelGLM, "Coast", scale = "resp") ## issues warning...
+visreg(TModelGLM, "Sea", by = "DayOfYear", scale = "resp")
+@
+<<line_525_,include=FALSE>>=
+Attach()  ## memory restorer
+@ 
+
+\subsection{A long-term trend?}
+\label{sec:long-term-trend}
+
+The stability of species ratios over time is important.  We can check
+for this by including a spline term in \rcode{ElapsedDays}:
+
+<<d6,cache=FALSE,.k=1>>=
+TM2 <- update(TModelGLM, . ~ . + ns(ElapsedDays, 7))
+Store(TM2, lib = .Robjects)
+@
+<<include=FALSE>>=
+if("package:MASS" %in% search()) detach("package:MASS")
+@
+
+<<d6anova,comment="">>=
+anova(TModelGLM, TM2, test = "F")
+@
+Significant, but is it important?
+<<d7,fig.height=5, fig.width=12, out.width="100%">>=
+visreg(TM2, "ElapsedDays", xlab = "Days since 1970-01-01")
+@
+
+
+\newslide
+\subsection{A working GAM with new technology}
+\label{sec:working-gam-with}
+
+The \rfile{mgcv} package represents a major advance in smooth model
+fitting technology in several respects, including
+
+\begin{itemize}
+\item Smoothed terms in multiple predictors can now be handled,
+\item A wide variety of basis functions is available, including
+  e.g.~thin plate splines, cyclic spline bases, \&c,
+\item A powerful \emph{visualisation} tool in projections of predictor
+  variable space is available in addition to tools for inspection of
+  individual terms
+\end{itemize}
+The price is:
+\begin{itemize}
+\item The package is still under development and new versions are
+  fairly common (though becoming less so)
+\item The implementation is to some extent non-standard \R.
+\end{itemize}
+
+\newslide
+
+The working model:
+<<d8,out.lines=10,cache=FALSE,message=TRUE>>=
+suppressPackageStartupMessages(library(mgcv))
+TModelGAM <- bam(Psem/Total ~ s(Longitude, Latitude) +  ## bam(...) oscillates!
+                 te(DayOfYear, Sea,   k = c(5, 5), bs = c("cc", "cs")) +
+                 te(DayOfYear, Depth, k = c(5, 5), bs = c("cc", "cs")) +
+                 te(Sea,       Depth, k = c(5, 5), bs = c("cs", "cs")) + ## NB!
+                 s(Mud, k = 5), 
+                 family = quasibinomial, data = Tigers,
+                 knots = list(DayOfYear = seq(1, 365.25, length = 5)),
+                 control = gam.control(trace = TRUE),    ## to check progress
+                 weights = Total/mean(Total))              ## takes forever!
+TModelGAM_NS <- update(TModelGAM, . ~ . + ns(ElapsedDays, 10),
+                       mustart = fitted(TModelGAM))  ## non-stationary
+Store(TModelGAM, TModelGAM_NS, lib = .Robjects)
+@
+\newslide
+Some notes:
+\begin{itemize}
+\item An \emph{isotropic} spatial term in \rcode{Longitude} and
+  \rcode{Latitude} to account for purely spatial effects;
+\item Tensor spline (non-isotropic) terms in each pair of
+  \rcode{DayOfYear}, \rcode{Depth} and \rcode{Sea} to account for
+  temporal and environmental effects;
+\item A smooth term in \rcode{Mud}, also for environmental effects;
+\item The terms in \rcode{DayOfYear} are periodic with period 365 days
+  (guaranteed by the data) in that coordinate \rcode{bs = "cc"};
+\item Other terms use a smooth spline basis, \rcode{bs = "cs"}.  Other
+  choices of bases are available.
+\end{itemize}
+
+% \newslide
+
+Some views of the fit:
+<<vis,out.width="95%",fig.width=10,fig.height=5.5,fig.show="hold">>=
+layout(rbind(1:2))
+plot(TModelGAM_NS, select = 1, asp = 1)
+lines(Oz, col = alpha("dark green", 0.8))
+title(main = "Lon x Lat, isotropic")
+for(j in 2:6)
+    plot(TModelGAM_NS, select = j)
+layout(rbind(1:2))
+vis.gam(TModelGAM_NS, view = c("Longitude","Latitude"),
+        r = 1000, theta = 30, phi = 15)
+title(main = "Lon x Lat, isotropic")
+vis.gam(TModelGAM_NS, view = c("DayOfYear","Sea"),
+        r = 1000, theta = 30, phi = 15)
+title(main = "Day of year x Sea")
+vis.gam(TModelGAM_NS, view = c("DayOfYear","Depth"),
+        r = 1000, theta = 30, phi = 15)
+title(main = "Day of year x Depth")
+vis.gam(TModelGAM_NS, view = c("Depth","Mud"),
+        r = 1000, theta = 30, phi = 15)
+title(main = "Depth x Mud")
+@
+
+\newslide
+
+\subsection{The spatio-temporal effect}
+\label{sec:spat-temp-effect}
+
+Finally, we look at daily predictions for one year at 4 locations
+within the Gulf of Carpentaria:
+
+
+<<e1,echo=FALSE,out.height="2.25in">>=
+Attach()
+par(mar=c(0,0,0,0))
+plot(cc, type = "n", ann=FALSE,axes=FALSE, asp=1, bty="n",
+     xlim = c(135, 143), ylim = c(-18.6, -9.6))
+points(Locz, pch=20, cex = 1.5, col="red")
+text(Latitude ~ Longitude, data = data4, Place, pos = c(4,4,3,2),
+     col = "navy")
+lines(Oz, col=grey(0.5), xpd = NA)
+@
+\newslide
+
+\begin{center}
+<<e2,echo=FALSE>>=
+Attach()
+require(lattice)
+trellis.par.set("grid.pars", list(fontfamily = "sans"))
+xyplot(Fsemi ~ DayOfYear|Place, FSemiData4, type = "l",
+       ylab=expression(italic(P.)~~italic(semisulcatus)~~plain(proportion)),
+       xlab = "Day of the year", aspect = 0.7)
+@
+\end{center}
+
+\newslide
+
+Note that the migration effect is strongest in the Vanderlins islands
+region, where the Tiger prawn catch is high.
+
+The prediction code is not shown, but the results are stored in a data
+frame called \rcode{FSemiData4}.  The graphic is generated by:
+
+<<line_665_,echo=TRUE,eval=FALSE>>=
+<<e2>>
+@
+Note the device for mixed fonts in the annotations.
+
+A \rcode{ggplot} version could be
+<<line_671_>>=
+ggplot(FSemiData4) + aes(x = DayOfYear, y = Fsemi) + 
+  geom_line(colour = "steelblue") +
+  labs(y = expression(italic(P.)~~italic(semisulcatus)~~plain(proportion)),
+       x = "Day of year") + facet_wrap(~Place, as.table = FALSE) +
+  theme_bw() + theme(strip.background = element_rect(fill = "#EED8AE"))  # "#FFE5CC"
+@
+
+
+\newslide
+% \clearpage
+\phantomsection
+\addcontentsline{toc}{section}{References}
+\nocite{venables02:_moder_applied_statis_s}
+\bibliography{refs}
+
+
+\newslide
+\phantomsection
+\addcontentsline{toc}{section}{Session information}
+\section*{Session information}
+\label{sec:sessinfo}
+\vspace{-10pt}
+\begin{tiny}
+<<sessionInfo,echo=FALSE,results="asis",out.lines=200>>=
+cat("{\\bf\nDate: ", format(today()), "\n}")
+toLatex(sessionInfo(), locale = FALSE)
+@
+\end{tiny}
+
+
+\end{slide}
+
+\end{document}
+

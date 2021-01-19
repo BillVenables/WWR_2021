@@ -1,0 +1,498 @@
+\documentclass{seminar}
+\usepackage[utf8]{inputenc}
+
+\usepackage{Rlogo}
+\usepackage{Rcolors}
+
+\usepackage{tabularx}
+\usepackage{SeminarExtra}
+\usepackage{op}
+
+\renewcommand{\hlcom}[1]{\textcolor[rgb]{0.625,0.125,0.9375}{\textsl{#1}}}%
+
+\DeclareGraphicsExtensions{.pdf,.png,.jpg,.JPG}
+\graphicspath{{Fig/}}
+
+<<"prelim",child="00-Prelim.Rnw">>=
+@
+
+<<setFigPath,include=FALSE>>=
+.infile <- sub("\\.Rnw$", "", knitr::current_input())
+knitr::opts_chunk$set(
+  fig.path = paste0('Fig/', .infile, "_"),
+  comment = "",
+  cache = FALSE
+) #$
+session <- sub("^0+", "", sub("[^[:digit:][:alpha:]].*$", "", .infile))
+@
+
+
+\usepackage{natbib}
+\bibliographystyle{chicago}
+
+\title{\Large \input{title.tex}
+  \Huge \red{Session \Sexpr{session}:\\[10pt]
+    Elementary Linear Models}}  %%% Change needed
+
+\input{authorAndDate}
+
+\begin{document}
+\setkeys{Gin}{keepaspectratio=TRUE}
+
+\begin{slide}
+\slidepagestyle{empty}
+
+  {\color{darkgreen}\maketitle}
+\end{slide}
+
+\begin{slide}
+\slidepagestyle{plain}
+\setcounter{slide}{1}
+
+\tableofcontents
+
+\newslide
+
+\section{A simple example: the Janka Hardness data}
+\label{sec:simple-exampl-janka}
+
+Example taken from E. J. Williams (1959) \emph{Regression Analysis}.
+
+Two variables:
+\begin{description}
+\item[Hardness]: The Janka hardness of a sample of timbers, (in lbs).
+  (See \href{http://en.wikipedia.org/wiki/Janka_hardness_test}{here}
+  for a discussion.)
+\item[Density]: The density of the sample, (in lbs/ft$^3$)
+\end{description}
+
+The problem: \emph{Build a predictor of Hardness from Density}.
+
+
+\newslide
+
+<<c01,fig.height=5,fig.width=7,out.height="2.5in">>=
+theme_set(theme_bw() + theme(plot.title = element_text(hjust=0.5)))
+
+ggplot(janka) + aes(x = Density, y = Hardness) +
+  geom_point(colour = "red") +  labs(title = "Janka Hardness")
+@
+
+\newslide
+
+\begin{itemize}
+\item Clearly strong dependence of Hardness on Density;
+\item Possibly curvilinear -- try polynomials first;
+\item Possibly with unequal variance?
+\end{itemize}
+<<c02>>=
+m1 <- lm(Hardness ~ Density, janka)
+m2 <- update(m1, . ~ . + I(Density^2))
+m3 <- update(m2, . ~ . + I(Density^3))
+round(summary(m3)$coef, 4)
+@
+
+\newslide
+\subsection{Alternative parametrizations}
+\label{sec:altern-param}
+
+
+Nothing is ``significant''!  Why?
+
+A modification:
+
+<<c03>>=
+m1a <- lm(Hardness ~ I(Density - 50), janka)
+m2a <- update(m1a, . ~ . + I((Density - 50)^2))
+m3a <- update(m2a, . ~ . + I((Density - 50)^3))
+round(summary(m3a)$coef, 4)
+@
+
+The models are fully equivalent, but the coefficients refer to
+different things
+
+\newslide
+
+\subsection*{The explanation in graphical terms}
+\label{sec:expl-graph-terms}
+\begin{center}
+<<"jank-3xx",fig.height=6,fig.width=8>>=
+m0a <- lm(Hardness ~ 1, janka)  ## constant predictor model
+m4a <- update(m3a, .~.+I((Density-50)^4))
+
+pJanka <- data.frame(Density = -5:75)
+pJanka <- within(pJanka, {
+  constant  <- predict(m0a, pJanka)
+  linear    <- predict(m1a, pJanka)
+  quadratic <- predict(m2a, pJanka)
+  cubic     <- predict(m3a, pJanka)
+  quartic   <- predict(m4a, pJanka)
+})
+
+pJankaLong <- pJanka %>%
+  pivot_longer(names_to="Model", values_to="Hardness", constant:quartic) %>%
+  mutate(Model = factor(Model, levels = cs(constant, linear, quadratic,
+                                           cubic, quartic)))
+
+titlex <- expression("Model:"*'  '*italic(H) ==' '*italic(beta[0] +
+    beta[1]*(D - alpha) + beta[2]*(D - alpha)^2 + cdots + epsilon))
+
+p <- ggplot(janka) + aes(x = Density, y = Hardness) + geom_point()  +
+  geom_line(aes(colour = Model), data = pJankaLong, size = 0.5) +
+  geom_hline(yintercept = 0, linetype = "solid", size = 0.25) +
+  geom_vline(xintercept = c(0,50), linetype = "solid",
+             size = 0.25, colour = "blue") +
+  annotate("text", x = c(0,50)-1, y = 3500, hjust = 1,
+           label = paste("alpha ==", c(0,50)), parse = TRUE,
+           size = 4) +
+  labs(x = expression(italic(D):' Density'),
+       y = expression(italic(H):' Hardness'),
+       title = titlex) +
+  theme(text = element_text(size = 12), legend.position = "bottom",
+        plot.title = element_text(hjust = 0.5, vjust = 1, size = 12)) +
+  scale_colour_brewer(palette = "Set1")
+p
+@
+\end{center}
+\newslide
+
+\subsection{Diagnostics and corrective action}
+\label{sec:diagn-corr-acti}
+
+
+<<c06,out.height="95%",fig.height=6,fig.width=6>>=
+layout(matrix(1:4, 2, 2, byrow = TRUE))
+plot(m2a)
+@
+
+
+
+\subsection{A transformation?}
+\label{sec:transformation}
+
+
+The main purpose of a transformation is to provide a scale in which
+the response is homoscedastic --- but no necessarily the only purpose.
+
+Transforming the response will affect both the mean structure and the
+variance.
+
+Consider a Box-Cox transformation on a) the straight line model and b)
+the quadratic model.
+
+<<c07,fig.width=10,fig.height=5>>=
+layout(matrix(1:2, 1))
+box_cox(m1a)
+title(main = "straight line model", line = 3)
+box_cox(m2a)
+title(main = "quadratic model", line = 3)
+@
+
+\newslide
+
+
+Assuming a straight line --- a square root transformation?
+
+Allowing for a quadratic response --- a log transformation?
+
+Consider the effect of the transformation on residuals:
+
+<<c09,fig.width=9,fig.height=7>>=
+m1 <- lm(sqrt(Hardness) ~ poly(Density, 1), janka)
+m2 <- lm(log(Hardness) ~ poly(Density, 2), janka)
+Janka <- within(janka, {
+  r1 <- resid(m1);   r2 <- resid(m2)
+  f1 <- fitted(m1);  f2 <- fitted(m2)
+})
+p0 <- ggplot(Janka)
+p1 <- p0 + aes(x = f1, y = r1) + geom_point() +
+  labs(x = "Fitted", y = "residuals", title = "sqrt - linear") +
+  geom_smooth(se = FALSE, method = "loess", size = 0.5,formula = y~x)
+p2 <- p0 + aes(x = f2, y = r2) + geom_point() +
+  labs(x = "Fitted", y = "residuals", title = "log - quadratic") +
+  geom_smooth(se = FALSE, method = "loess", size = 0.5, formula = y~x)
+p3 <- p0 + aes(sample = r1) + stat_qq() + stat_qq_line()
+p4 <- p0 + aes(sample = r2) + stat_qq() + stat_qq_line()
+
+(p1 + p2)/(p3 + p4)
+@
+
+\newslide
+
+The message so far:
+\begin{itemize}
+\item A square root transformation straightens out the regression
+  line, but
+\item A log transformation is necessary to even out the variance.
+\end{itemize}
+
+This suggests a generalized linear model:
+\begin{itemize}
+\item with a \rcode{sqrt} link, to give a scale in which the response
+  is straight line,
+\item with a variance function $\propto \mu^2$ to allow for variance
+  heterogeneity.
+\end{itemize}
+
+Within the GLM family this suggests a Gamma model.  The \rcode{sqrt}
+link is non-standard, which \emph{used} to be a problem, but no longer.
+
+\newslide
+
+<<c11>>=
+mGLM <- glm(Hardness ~ I(Density-50),
+             family = Gamma(link = "sqrt"),
+             data = janka)
+mGLM2 <- update(mGLM, .~.+I((Density-50)^2))
+round(summary(mGLM2)$coef, 4)
+@
+%%$
+
+\newslide
+The straight line model seems adequate - residual checks:
+
+<<c12,fig.width=9,fig.height=5>>=
+rs <- resid(mGLM)
+fv <- fitted(mGLM)
+layout(matrix(1:2, 1))
+plot(fv, rs, xlab = "fitted values", ylab = "residuals",
+     pch = 20, col=grey(0.5), main = "Variance uniformity")
+abline(h = 0, lty = "dashed", col="red"); grid()
+
+qqnorm(rs, pch = 20, col = grey(0.5), xlab = "Normal scores",
+       ylab = "sorted residuals", main = "Normal Q-Q plot")
+qqline(rs, col="red", lty = "dashed"); grid()
+@
+
+\newslide
+
+\subsection{A simpler approach}
+\label{sec:simpler-approach}
+\begin{itemize}
+\item What happens if we transform \emph{both} response and predictor?
+\item A multiplicative model seems heuristically reasonable:
+  \begin{displaymath}
+    H = \alpha D^{\beta}\exp E \quad \implies \quad \log H =
+    \alpha^{\star}+\beta\log D +E\quad (\alpha^{\star} = \log \alpha)
+  \end{displaymath}
+% \item Simple back transformation will give an estimate of the
+%   \emph{median}.  In some cases an estimate of the mean is more
+%   appropriate.  See, e.g. \citet{shen08:_effic}.
+
+<<c14,eval=FALSE>>=
+ggplot(janka) + aes(x = Density, y = Hardness) +
+  geom_point() + scale_x_log10() + scale_y_log10() +
+  stat_smooth(method = "lm", size = 0.5, colour = "hot pink", formula = y~x)
+@
+  \item This suggests a Gamma model with a \emph{log} link and a
+  log-transformed predictor, linear term only.  So it proves to be.
+  \item Using a GLM, leaving the response untransformed, allows us
+  to predict on the natural scale, thus avoiding the complications
+  associated with back transforming predictions.
+\end{itemize}
+<<line_289_,echo=FALSE>>=
+<<c14>>
+@
+\newslide
+Compare the final model with a simple quadratic regression, ignoring
+variance heterogeneity.
+
+<<line_296_>>=
+jankaLM <- lm(Hardness ~ poly(Density, 2), janka)
+pJanka <- data.frame(Density = 24:70)
+ext <- predict(jankaLM, pJanka, type = "resp", se.fit = TRUE) %>%
+  as.data.frame() %>%
+  within({
+    lower <- fit - 2*se.fit
+    upper <- fit + 2*se.fit
+  })
+pJanka <- cbind(pJanka, ext)
+pLM <- ggplot(pJanka) + aes(x = Density) +
+  geom_line(aes(y = fit), colour = "black") +
+  geom_line(aes(y = lower), colour = "grey") +
+  geom_line(aes(y = upper), colour = "grey") +
+  geom_point(data = janka, aes(y = Hardness), colour = "red") +
+  xlab("Density") + ylab("Hardness") + labs(title = "Naive quadratic")
+@
+\newslide
+<<line_314_,fig.height=6,fig.width=12,out.height="80%">>=
+jankaGLM <- glm(Hardness ~ log(Density), Gamma(link = log), janka)
+pJanka <- data.frame(Density = 24:70)
+ext <- predict(jankaGLM, pJanka, type = "resp", se.fit = TRUE) %>%
+  as.data.frame() %>%
+  within({
+    lower <- fit - 2*se.fit
+    upper <- fit + 2*se.fit
+  })
+pJanka <- cbind(pJanka, ext)
+
+pGLM <- ggplot(pJanka) + aes(x = Density) +
+  geom_line(aes(y = fit), colour = "black") +
+  geom_line(aes(y = lower), colour = "grey") +
+  geom_line(aes(y = upper), colour = "grey") +
+  geom_point(data = janka, aes(y = Hardness), colour = "red") +
+  xlab("Density") + ylab("Hardness") + labs(title = "Gamma-log")
+# 
+# gridExtra::grid.arrange(pLM, pGLM, nrow = 1)
+pLM + pGLM
+@
+
+
+\newslide
+\subsection{Bootstrap confidence intervals for the mean}
+\label{sec:Confidece intervale for the mean}
+\subsubsection{Classical version}
+\label{sub:Classical }
+
+The idea is that we predict the mean for a large number of \emph{bootstrap samples}
+of the original model, re-fitting the model as if the bootstrap sample were the
+real data.  The quantiles of the bootstrap predictions provide the appropriate
+confidence interval.
+
+The code is simple and explains the method more precisely.
+\newslide
+
+<<line_350_>>=
+set.seed(20210202)
+boot_sample <- function(data) data[sample(nrow(data), replace = TRUE), ]
+
+ci <- replicate(500, {
+  tmp <- update(jankaGLM, data = boot_sample(janka))  ## bootstrap data
+  predict(tmp, pJanka, type = "resp")                 ## predictions for target
+}) %>%
+  apply(1, quantile, prob = c(0.025, 0.975))
+
+pJanka <- pJanka %>%
+  within({
+    lowerBB <- ci[1, ]
+    upperBB <- ci[2, ]
+  })
+
+greenish <- alpha("dark green", 0.5)
+pGLM + labs(title = "Classical bootstrap") +
+  geom_line(data = pJanka, aes(x = Density, y = lowerBB),
+            colour = greenish, size = 0.5) +
+  geom_line(data = pJanka, aes(x = Density, y = upperBB),
+            colour = greenish, size = 0.5)
+
+@
+
+
+
+
+\subsubsection{Bayesian version}
+\label{sec:bootstr-conf-interv}
+
+An alternative to the classical bootsrtap is the Bayesian
+Bootstrap idea of \citet{rubin81:_bayes_boots}.
+\begin{itemize}
+\item Re-fit the model with \emph{random weights} for the observations.
+\item Choosing $W \sim \mathrm{Exp}(1)$ gives $\E W = 1 = \Var W$, the
+  same as for the normal bootstrap.  (Rubin gives a theoretical
+  justification.)
+\end{itemize}
+
+<<cexp>>=
+X <- matrix(sample(100, size = 1000*100, replace = TRUE), ncol = 100) %>%
+  apply(1, tabulate, nbins = 100)
+CB <- c(mean     = mean(colMeans(X)),
+        variance = mean(colMeans((X-1)^2)))
+W <- rexp(10000)
+BB <- c(mean = mean(W), variance = var(W))
+rbind(Classical = CB, Bayesian = BB)
+@
+The code is nearly identical to the classical case.
+\newslide
+<<c20,cache=FALSE>>=
+set.seed(20210202)
+Norm <- function(x) x/mean(x)
+
+ci <- replicate(500, {
+  tmp <- update(jankaGLM, weights = Norm(rexp(nrow(janka))))
+  predict(tmp, pJanka, type = "resp")
+}) %>%
+  apply(1, quantile, prob = c(0.025, 0.975))
+
+pJanka <- pJanka %>%
+  within({
+    lowerBB <- ci[1, ]
+    upperBB <- ci[2, ]
+  })
+
+greenish <- alpha("dark green", 0.5)
+pGLM + labs(title = "Bayesian bootstrap") +
+  geom_line(data = pJanka, aes(x = Density, y = lowerBB),
+            colour = greenish, size = 0.5) +
+  geom_line(data = pJanka, aes(x = Density, y = upperBB),
+            colour = greenish, size = 0.5)
+@
+
+\newslide
+
+\subsection{Some more recent data}
+\label{sec:some-recent-data}
+
+These date from 2012.  They were obtained from the internet, but the units were not given.
+
+<<recent,fig.show="hold">>=
+Janka <- within(Janka2012, {
+  Type <- ifelse(grepl("Eucalyptus", Binomial), "Eucalpyt", "Other") %>%
+    factor()
+})
+
+jp <- ggplot(Janka, aes(Density, Hardness)) + geom_point() +
+  aes(colour = Type) + coord_trans("log10", "log10") +
+  scale_colour_brewer(palette = "Set1", name = "Genus")
+jp
+jp  +  ## identify the light species
+  ggrepel::geom_text_repel(data = filter(Janka, Density < 600),
+                           aes(label = Name), size = 3,
+                           colour = greenish,  ## some transparency
+                           fontface = "bold", family = "serif")
+@
+
+
+\newslide
+Comparing model estimates:
+\begin{center}
+
+<<recent2,results="asis">>=
+oldJanka <- glm(Hardness~log(Density), Gamma(link="log"), janka)
+newJanka <- update(oldJanka, data = Janka)
+format(cbind(old = coef(oldJanka),
+             recent = coef(newJanka)),
+       digits = 5) %>% booktabs()
+@
+
+\end{center}
+
+The discrepancy in the intercept coefficients is due to a mismatch of units.
+The coefficient of $\log(\mathrm{Density})$ is unit free.
+
+
+
+\newslide
+% \clearpage
+\phantomsection
+\addcontentsline{toc}{section}{References}
+\nocite{venables02:_moder_applied_statis_s}
+\bibliography{refs}
+
+\newslide
+\phantomsection
+\addcontentsline{toc}{section}{Session information}
+\section*{Session information}
+\label{sec:sessinfo}
+\vspace{-10pt}
+\begin{tiny}
+<<sessionInfo,echo=FALSE,results="asis",out.lines=200>>=
+cat("{\\bf\nDate: ", format(today()), "\n}")
+toLatex(sessionInfo(), locale = FALSE)
+@ %def
+\end{tiny}
+
+
+\end{slide}
+
+\end{document}
+

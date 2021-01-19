@@ -1,0 +1,648 @@
+\documentclass{seminar}
+\usepackage[utf8]{inputenc}
+
+\usepackage{RlogoNew}
+\usepackage{Rcolors}
+
+\usepackage{tabularx}
+\usepackage{SeminarExtra}
+\usepackage{op}
+
+\renewcommand{\hlcom}[1]{\textcolor[rgb]{0.625,0.125,0.9375}{\textsl{#1}}}%
+
+\DeclareGraphicsExtensions{.pdf,.png,.jpg,.JPG}
+\graphicspath{{Fig/}}
+
+<<"prelim",child="00-Prelim.Rnw">>=
+@
+
+<<setFigPath,include=FALSE>>=
+.infile <- sub("\\.Rnw$", "", knitr::current_input())
+knitr::opts_chunk$set(fig.path = paste0('Fig/', .infile, "_")) #$
+session <- sub("^0+", "", sub("[^[:digit:][:alpha:]].*$", "", .infile))
+@ 
+
+\usepackage{natbib}
+\bibliographystyle{chicago}
+
+\title{\Large \input{title.tex}
+  \Huge \red{Session \Sexpr{session}:\\[10pt]
+    Introduction and Outline}}  %%% Change needed
+    
+<<line_032_,include=FALSE>>=
+rm(session)
+@
+
+\input{authorAndDate}
+
+\begin{document}
+\setkeys{Gin}{keepaspectratio=TRUE}
+
+\begin{slide}
+\slidepagestyle{empty}
+
+  {\color{darkgreen}\maketitle}
+\end{slide}
+
+\begin{slide}
+\slidepagestyle{plain}
+\setcounter{slide}{1}
+
+\tableofcontents
+
+\newslide
+
+\section{Preliminaries}
+\label{sec:prelim}
+
+\begin{itemize}
+\item \R is a \emph{programming language} that grew out of a suite of
+  \emph{interactive} tools for data analysis, graphics and modelling.
+\item The emphasis has changed from an interactive focus to working
+  in a \emph{reproducible} way.
+\item We also recommend working in a \emph{platform neutral} and
+  \emph{portable} way. 
+  \begin{itemize}
+  \item \RStudio \emph{projects} are key.
+  \end{itemize}
+\item We assume at least some superficial familiarity with \R
+  \begin{itemize}
+  \item our aim in this workshop is to deepen and strengthen your
+    understanding of \R and how to work productively \emph{with} \R.
+  \end{itemize}
+
+\item This is \emph{not} a Statistics course, but statistics and
+  modelling will play a large part in what we do.
+  
+\item To work with \R is, at some level at least, to \emph{program}.
+\end{itemize}
+\newslide
+
+\subsection{The \RStudio IDE: gratuitous advice}
+\label{sec:rstudio}
+
+\begin{itemize}
+\item \RStudio is an IDE ('integrated development environment') which
+  facilitates using \R, in a reproducible way.
+\item It comes in a free version and also with several levels of
+  commercial support.  The free version is (so far!) entirely
+  adequate.
+\item \emph{You do not have to use it}, but if you collaborate with
+  colleagues using \R, it is practically certain they will be.
+\item Learn to use it \emph{properly} rather than just ``well enough''
+  for your immediate goals.\\ Use \R to \emph{learn
+  how to learn}: you will need the knack often in future.
+\item The key to using \RStudio properly is to work with
+  \emph{projects}, keeping things compact and portable.
+\item The materials for this course are distributed as an \RStudio
+  project, developed on \Linux.  The should nevertheless work
+  seamlessly across platforms.
+\end{itemize}
+\newslide
+
+\subsection{The concept of an \RStudio \em project}
+\label{sec:proj}
+
+\begin{itemize}
+\item The idea is to set aside a dedicated master folder, or
+  directory, in which to locate all the materials for a discrete piece
+  of work.  
+  \begin{itemize}
+  \item Sub-folders will normally be used for various purposes,
+    including data sets, scripts, reports, graphics, \&c.
+  \item In addition, \RStudio may also create specific sub-folders to
+    hold the output materials for document rendering.
+  \item In this course we will also have \emph{hidden} sub-folders to
+    hold cached objects. These have names such as \verb|.R_Cache| and
+    \verb|.Robjects|. 
+  \end{itemize}
+
+\item A new \RStudio project is created from within \RStudio itself
+  using a simple menu-driven process.\\
+  This will also put inside your project folder several house-keeping
+  sub-folders and files, one of which is a tag.\\ If the project folder is
+  called, for example, \verb|MyProject|, the tag file within it will be
+  called \verb|MyProject.Rproj|
+\end{itemize}
+\newslide
+
+\subsubsection{Using \RStudio projects: The tag file}
+\label{sec:usingprojects}
+
+To start \RStudio \emph{within a project}
+\begin{itemize}
+\item Do \red{not} click any \RStudio button to start the program.
+\item Begin by using your \emph{file locator} (or other means) to find
+  the project on which your wish to work.
+\item Double-click on the tag file, e.g. \verb|MyProject.Rproj|.
+
+  This will start \RStudio with the project context saved from the
+  last time you worked on it.
+\end{itemize}
+
+Alternatively, for those people unable \emph{not} to begin by clicking
+on the \RStudio button:
+
+\begin{itemize}
+\item Start \RStudio by clicking on the button, if you \emph{must}.
+\item Click on the \verb|File -> Open Project| menu.
+\item Navigate to the project directory you wish to work upon and
+  select the tag file as above.
+\end{itemize}
+
+\newslide
+
+\subsubsection{Setting global and project options}
+\label{sec:globals}
+
+To make your working environment more comfortable, you may set \RStudio
+options.
+\begin{itemize}
+\item The \emph{Global} options will apply every time you use \RStudio
+  on that machine.
+  
+  Edit these using \verb|Tools -> Global Options|.
+\item In addition, there are a few \emph{Project} options, which may
+  be set for the current project only, but will apply when next you work
+  on that project.
+  
+  Edit these using \verb|Tools -> Project Options|.
+
+\item One hidden feature of \RStudio worth checking out are
+  code \red{snippets}.  These can greatly help when coding or
+  drafting documents.
+  
+  See \verb|Tools -> Globap Options -> Code -> Snippets|
+% \item One global option you can choose is for \RStudio to start
+%   \emph{in the same project as you last worked upon}.  If you are
+%   mostly working on one project, the second start process mentioned
+%   above becomes much like the first.
+\end{itemize}
+
+\newslide
+\subsection{Working protocols}
+\label{sec:work-with-scripts}
+
+\begin{itemize}
+\item Establish your primary data sources early.
+\item Establish a clear path from your primary data
+  sources to \R, and be prepared for changes.  Hence:
+\item Work \red{reproducably}.  Two approaches:
+\begin{itemize}
+  \item Use \R scripts, with a clearly defined sequence to reproduce all
+     the steps of the analysis.  Use comments to explain what is going on.
+     \RStudio{} \red{codebooks} can easily turn scripts into (rudimentary)
+     documents.
+  \item Better still, use \RStudio{} \red{notebooks} or \red{Rmarkdown} files
+     for \emph{both} documentation and code \emph{together}.
+\end{itemize}
+\end{itemize}
+\newslide
+
+\begin{itemize}
+\item \emph{Work \red{portably}}.  Make sure you can send the \emph{entire
+  \RStudio project directory} to another system and have it work
+  \emph{seamlessly and without change}.
+\item \emph{\red{Do not use absolute file names in scripts!}}  Your file
+  names should be relative to the working directory.
+   \item \emph{\red{NEVER}} use \rcode{setwd()}, especially not in scripts!
+
+\item Keep your global environment clean and uncluttered.  
+\item Do not rely on
+  saved items \emph{in the workspace} from one session to the next. 
+\item Use the \rcode{SOAR} package judiciously for temporary transfers 
+  between sessions.
+
+\end{itemize}
+\newslide
+\subsection{Use the file system}
+\label{sec:use-file-system}
+
+In working with \R, \emph{use the file system}.  A good protocol is
+\begin{itemize}
+\item For each new project, set up a \emph{working directory} which
+  will contain all the files needed for that project in one place.
+\item The working directory may contain sub-directories for natural
+  entities such as \rfile{data}, \rfile{fig}, \rfile{archive},
+  \rfile{scripts}, \rfile{results}, \&c
+  
+  You can do a lot of file management from within \R itself, usually vie
+  the console rather than in scripts.  E.g.
+<<fileops, eval=FALSE>>=
+if(!dir.exists("data")) dir.create("data")
+file.copy("myData.csv", "data/")
+file.remove("myData.csv")  ## now that a saved copy is available in data/
+@
+  
+\item Start \R \emph{in} the working directory via the \RStudio tag
+  file rather than start elsewhere use the GUI or \rcode{setwd()} to go
+  there.  (The latter is non-portable, of course!)
+\end{itemize}
+
+\newslide
+
+\section{The search path and how to use it}
+\label{sec:The search path}
+
+\begin{itemize}
+  \item The \R session works by finding \emph{objects} and \emph{evaluating} them.
+  \item \emph{Objects} are found by looking down the \emph{search path}, set up initially
+  by \R and modified during the session by functions such as \rcode{library}, \rcode{require},
+  \rcode{detach}, \rcode{SOAR::Attach}, \&c.
+  \item Two ways to keep an eye on the search path:
+  \begin{itemize}
+    \item Using the button in \RStudio.
+    \item From the command line.  E.g. 
+
+<<search,out.lines=6>>=
+search() %>% noquote()             ## no "quotation" marks, please!
+@
+\newslide
+    \item You can see what is in any position of the search path using \rcode{ls}:
+<<line_248_,out.lines=6>>=
+ls("package:WWRUtilities") %>% noquote()
+@
+    \item You can also find where things are on the search path using \rcode{find}:
+<<line_252_>>=
+pi <- 22/7                    ## good enough for gevernment purposes
+find("pi", numeric = TRUE)    ## gives position in search path
+print(c(pi, base::pi), digits = 20)
+@
+    It is the \emph{first} occurrence that is
+    selected by the \R interpreter.  For safety use a package qualifier: 
+    \verb|base::pi|, which works
+    \emph{whether or not} the package itself is currently on the search path.
+    
+    % Because the \code{dplyr} version of \rcode{select} occurs \emph{before} the \code{MASS} version
+    % means \rcode{select(....)} will find it first.  To use the \code{MASS} version
+    % of \rcode{select} you would need to use \rcode{MASS::select(....)} to override the
+    % search path.
+  \end{itemize}
+\end{itemize}
+\newslide
+\subsection{Modifying the search path (and ways to avoid it)}
+\label{sub:Modifying the search path (and ways to avoid it)}
+
+An example
+<<line_266_,out.lines=6>>=
+search()[1:3]
+myList <- list(x = 3, y = rnorm(10000), z = TRUE)
+attach(myList)
+ls()
+search()[1:4]
+x <- 4
+find("x")
+rm(x)
+x
+@
+\newslide
+An example, continued.
+<<line_279_>>=
+detach("myList")
+search()[1:3]
+x
+ls()
+myList$x
+@
+\begin{itemize}
+  \item \emph{NEVER} use \rcode{attach()}/\rcode{detach()} in this way!
+  \item The tools \rcode{with()} and \rcode{within()} provide simpler,
+    clearer and safer ways of achieving the same result.
+\end{itemize}
+\newslide
+\subsubsection{\rcode{with} and \rcode{within}}
+\label{ssub:with and within}
+
+\begin{itemize}
+  \item Both take two arguments: 
+  \begin{itemize}
+    \item a \rcode{list} (or \rcode{data.frame}) and 
+    \item an \code{expression} to be evaluated.
+  \end{itemize}
+  \item The \code{expression} is evaluated \emph{with the
+  components of the list used as variables ahead of the
+  search path, including the global environment.}
+  \item In the case of \rcode{with(list, expr)} the result
+  is the \emph{value of the expression}.
+  \item In the case of \rcode{within(list, expr)} the
+  result is \emph{a modified list, (usually a data frame)}
+  with the expression defining the changes.
+  \item In both cases the \rcode{expr} is usually a sequence
+  enclosed in braces, \verb|{ ... }|
+\end{itemize}
+
+In addition to safety, both provide elegant ways of avoiding ``dollar clutter''
+in your code and hence making it much easier to read and to maintain.
+\newslide
+Examples:
+<<line_317_>>=
+find("quine"); head(quine, 2)
+##
+## compare:
+tapply(quine$Days, list(quine$Sex, quine$Age), mean)
+##
+## with using with()..
+with(quine, {
+  tapply(Days, list(Sex, Age), mean)
+})
+@
+\newslide
+Examples (continued)
+<<line_330_>>=
+quine_ext <- within(quine, {
+  LSE         <- Lrn:Sex:Eth  
+  levels(Age) <- paste0("Form", 0:3)
+  Means       <- ave(Days, LSE, Age, FUN = mean)
+  Residuals   <- Days - Means
+}) %>% select(Eth:Lrn, LSE, Days, Means, Residuals)  ## pipes will occur a lot!
+head(quine_ext, 3)
+with(quine_ext, {
+  tapply(Days, list(Age, LSE), median)
+})
+@
+\newslide
+
+\newslide
+\subsection{The \rfile{SOAR} package, (now included within \rfile{WWRCourse})}
+\label{sec:temp-less-temp}
+
+\begin{itemize}
+\item Use for keeping objects from one session to the next.
+  Especially useful for \emph{large} objects, or objects requiring a
+  lot of time to generate.
+\item Keeps \rfile{.RData} files of stores objects in a sub-directory
+  of the working directory, \rfile{./.R\_Cache}.
+\item Four key functions:
+\begin{itemize}
+  \item \rcode{Store(...)}: place objects in cache, removing from
+  memory, but still visible as \emph{promises},
+\item \rcode{Objects()} (or \rcode{Ls()}): list cache contents,
+\item \rcode{Attach()}: place the cache on the search path as promises
+\item \rcode{Remove(...)}: delete objects from the cache, permanently.
+\end{itemize}
+\item An additions function, \rcode{Search()}, gives and enhanced view of
+the current search path.
+\end{itemize}
+\newslide
+\begin{itemize}
+  \item In this workshop we work with two cache folders, 
+  \begin{itemize}
+    \item \rfile{.R\_Cache} for temporaries and 
+    \item \rfile{.Robjects} for initial supply and more permanent carryover.
+  \end{itemize} 
+\item From the session initialisation script:
+\end{itemize}
+<<line_374_,eval=FALSE>>=
+Attach(lib = .Robjects)
+                     ## check for duplicate dataset copies
+._objects <- intersect(ls(".Robjects"), ## could have used Ls(lib=.Robjects)
+                       ls("package:WWRCourse"))
+if(length(._objects) > 0) {
+  Remove(list = ._objects, lib = .Robjects)  ## remove duplicates
+}
+rm(._objects)        ## a hidden object, seen only by ls(all = TRUE)
+  
+Attach()             ## the .R_Cache folder, same as Attach(lib = .R_Cache)
+Remove(list = Ls())  ## clean up working .R_Cache,  
+rm(list = ls())      ## clean up workspace ... for now.
+@
+\newslide
+\section{Objects and working with them}
+\label{sec:Objects and working with them}
+
+\begin{quote}
+``\emph{Everything} in \R is an object,\\
+\emph{Everything} you do in \R is a function call.\\
+\null\hspace{2cm} John M. Chambers, c. 2005 
+\end{quote}
+\begin{itemize}
+  \item Two broad kinds of object:
+\begin{description}
+  \item[Atomic] Five main types \rcode{numeric}, \rcode{character}, 
+      \rcode{logical}, \rcode{complex} and \rcode{raw}.  (A sixth type, 
+      \rcode{integer} is now commonly recognized, but for most 
+         purposes can be regarded as \rcode{numeric}.)
+  \item[Recursive] Main ones \rcode{list} (including \rcode{data.frame}s), 
+      \rcode{language} (such as \rcode{formula}s, 
+      \rcode{expression}s and \rcode{function}s) and \rcode{environment}s
+\end{description}
+\item Objects may carry additional information as \rcode{attribute}s.  E.g. 
+  \rcode{length}, \rcode{names}, \rcode{dim}, \rcode{dimnames}, \rcode{levels} and, most
+  importantly \rcode{class}.
+\item In this sense, objects are \emph{self-describing}, (or the \emph{should be!})
+\newslide
+\item All objects have \emph{components}, which may be accessed by operators (functions)
+   such as \rcode{[}, \rcode{[[}, \rcode{\$}.
+   \begin{itemize}
+     \item Atomic objects are characterised by having all their components of the
+       one (atomic) kind.
+     \item Recursive objects can have components of different kinds; in the case
+     of lists and environments these can be of any kind whatever, (including lists
+     and environments - hence the name ``recursive'').
+   \end{itemize}
+\item Atomic objects are the ``building blocks'' of the objects we usually work
+  with, such as \emph{data objects}, \emph{fitted model objects}, 
+  \emph{graphical objects} and even \emph{language objects}.
+\item The \rcode{class} attribute of an object, determines how \emph{generic functions}
+  behave when presented with them as an argument.  
+  
+  These include many familiar actions such as printing, plotting, 
+  summarizing, \&c, as well as the generic functions
+  you write yourself for new actions of a generic kind in your work.
+\end{itemize}
+\newslide
+Some simpler examples:
+<<line_434_>>=
+(x <- structure(1:20, names = letters[1:20]))
+## compare (names attribute retained)
+x[5]
+## with (names attribute discarded)
+x[[5]]
+## give it a class
+class(x) <- "shuffle"; x
+## now provide a pring method for such objects
+print  ## the generic function in the base package
+print.shuffle <- function(x, ...) {
+  cat("This shuffle is:\n")
+  print.default(sample(x))
+  invisible(x)
+}
+x            ## implicit call to print(x)
+x            ## implicit call to print(x) again
+@
+\newslide
+More realistic example. Some bad practices, and why
+
+<<line_455_,out.height="0.6\\textheight",out.lines=6>>=
+find("janka")
+# head(janka)
+plot(Hardness ~ Density, janka, pch=20, bty="n") ## plot with formula
+fm <- lm(janka$Hardness ~ janka$Density)  ## poor. Cannot predict from fm
+fm <- with(janka, lm(Hardness ~ Density)) ## bad. Object not fully self-describing
+fm <- lm(Hardness ~ Density, data = janka)## good. Self-describing and prediction OK
+class(fm)
+methods(class = class(fm))
+summary(fm)$coefficients
+abline(coef(fm), col = "red")
+@
+<<line_467_,out.height="0.8\\textheight">>=
+par(mfrow = c(2,2))
+plot(fm)   ## call to the "lm" method function of plot()
+@
+\newslide
+\section{Course packages}
+\label{sec:Course packages}
+
+The course materials includes four \emph{interdependent} source packages.
+\begin{description}
+  \item[\rcode{WWRData}] Is a pure data package containing the data sets used,
+  and more.
+  \item[\rcode{WWRGraphics}] Is a collection of functions to provide various
+    enhancements to traditional (base) graphics. 
+  \item[\rcode{WWRUtilities}] Is a collection of functions providing some
+    extension to, and enhancement of, the modelling tools in the \rfile{MASS}
+    package.  It may be useful in its own right after the workshop.
+  \item[\rcode{WWRCours}] Is a collection of functions and other
+    materials to be used in the workshop and unlikely to be useful afterwards.
+  \item[Installation] These packages are to be installed \emph{from source}.
+    This can be done from \RStudio  from \verb|Packages -> Install| or
+    from the console.
+    
+    It is important they be installed in order: First \rcode{WWRData}, then \rcode{WWRGraphics},
+    then \rcode{WWRUtilities} and finally \rcode{WWRCours}.
+    
+\end{description}
+\newslide
+\section{Package structure and installation}
+\label{sec:Package structure and installation}
+
+\begin{description}
+  \item[Construction] Packages are constructed as \code{folders} (aka \code{directories})
+    and on construction have a particular structure:
+    \begin{itemize}
+      \item The top level has two plain files called \code{DESCRIPTION} and \code{NAMESPACE},
+      \item There are several subdirectories present initially, including \code{R}, \code{man},
+      \item Other subdirectories with special roles include 
+         \code{src}, \code{data}, \code{vignettes} and \code{inst}.
+    \end{itemize}
+  \item[Building] When a package is \emph{built}, (by \R):
+    \begin{itemize}
+      \item a series of basic checks are made, vignettes, if any, are built
+      the result is placed in a folder \code{inst/doc},
+      created on the fly, if necessary.
+      \item The result is not a changed folder, but rather a compressed 
+        \code{.tar} file, (``tape archive''!) with a name encoding the
+        package name the version numbers.  E.g. \rfile{WWRData\_0.1.0.tar.gz}.  
+      \item To recover the (slightly modified) construction folder from such a file use\\
+      \rfile{tar zxvf WWRData\_0.1.0.tar.gz}\\
+      on the command line in a suitable shell (provided you have the tools installed,
+      of course!).
+    \end{itemize}
+  \item[Installation] The process of installing a built package
+    decompresses and expands the \code{.tar.gz} file as a package folder
+    in your package tree (i.e. your library), but
+    \begin{itemize}
+      \item The process causes further changes that are irreversible:
+    \begin{itemize}
+      \item Code files are byte-compiled and stored as binaries, as well as
+        with all the data, help, \&c.  \code{html} help versions are created.
+      \item The \code{inst} folder is removed, but anything inside it, 
+        usually \code{doc} and \code{extdata} subfolders, are raised to the 
+        top level of the installed package folder, \emph{verbatim}.  (I.e. the
+        checking and modification processes are bypassed.)
+      \item Any unneeded files or folders, including \code{data-raw}, are
+        discarded. 
+    \end{itemize}
+    
+    \item To install a built package from the command line use\\[0.1in]
+      \rfile{R CMD INSTALL WWRData\_0.1.0.tar.gz}\\[0.1in]
+      To install a built package from within \R itself use
+      
+      \begin{footnotesize}
+      \rfile{install.packages("WWRData\_0.1.0.tar.gz", repos = NULL)}
+      \end{footnotesize}
+    
+    In both cases you need to have the \code{.tar.gz} file in your working
+      directory. (Alternatively you could provide the file path to it.)
+    
+    \item If packages are installed manually like this, it is important to have
+    any dependencies installed beforehand.  
+    
+    E.g. \rfile{WWRCourse} depends
+    on \rfile{WWRUtilities}, which itself depends on \rfile{WWRGraphics},
+    so they must be installed in this reverse order.  
+    
+    Note that there
+    are further CRAN dependencies for all of them, too, so these need to
+    be installed before you start.
+
+    \end{itemize}
+  \end{description}
+
+\newslide
+Example: An Australian round trip
+<<line_560_>>=
+library(WWRGraphics)
+brownish <- alpha("rosy brown", 0.5)
+pinkish <- alpha("hot pink", 0.5)
+z <- with(roundTrip, 
+          complex(real = Longitude, imaginary = Latitude) %>% 
+            setNames(Locality))
+plot(z, asp = 1, ann = FALSE, bty = "n", pch = 20)
+lines(Oz, col = brownish)
+text(z, names(z), cex = 0.7, pos = avoid(z), offset = 0.25, col="dark grey")
+arrows(z, col = "steel blue", gap = 1, circular = TRUE, length = 2)
+dists <- gcd_km(z, cyc(z)) %>% round()
+text((z + cyc(z))/2, dists, col = "dark green", cex = 0.7, font = 4)
+##
+## add city sizes
+## 
+circles(Latitude ~ Longitude, roundTrip, radii = sqrt(Population),
+       fill = pinkish, colour = pinkish, maxradius = 0.5)
+@
+\newslide
+Example: A random exploding polygon.
+<<line_581_,out.height="0.45\\textheight">>=
+par(mar = rep(0, 4))
+set.seed(20200211)
+z <- complex(real = runif(300), imaginary = runif(300))
+z <- z[order(Arg(z - mean(z)))]
+plot(z, asp = 1, ann = FALSE, axes = FALSE, pch = ".", 
+     xlim = 0:1, ylim = 0:1)
+greenish <- alpha("dark green", 0.7)
+rect(0, 0, 1, 1, fill = greenish, colour = greenish)
+polygon(z, fill = getColors("French beige"), colour = "beige")
+@
+
+
+\newslide
+% \clearpage
+\phantomsection
+\addcontentsline{toc}{section}{Some useful books}
+\renewcommand\refname{Some useful books:}
+\nocite{Jones_Mailardet_Robinson_2020}
+% \nocite{venables02:_moder_applied_statis_s}
+\nocite{matloff11:_art_r_progr}
+\nocite{chang19:_r_graph_cookb}
+\nocite{wichham19:_advan_r}
+\nocite{wickham09}
+\nocite{murrell11:_r_graph}
+\bibliography{refs}
+
+\newslide
+\phantomsection
+\addcontentsline{toc}{section}{Session information}
+\section*{Session information}
+\label{sec:sessinfo}
+
+\begin{tiny}
+<<sessionInfo,echo=FALSE,results="asis",out.lines=200>>=
+cat("{\\bf\nDate: ", format(Sys.Date()), "\n}") 
+toLatex(sessionInfo(), locale = FALSE)
+@ %def
+\end{tiny}
+
+\end{slide}
+
+\end{document}
+

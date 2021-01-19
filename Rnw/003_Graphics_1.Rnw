@@ -1,0 +1,491 @@
+\documentclass{seminar}
+\usepackage[utf8]{inputenc}
+
+\usepackage{RlogoNew}
+\usepackage{Rcolors}
+
+\usepackage{tabularx}
+\usepackage{SeminarExtra}
+\usepackage{op}
+
+\renewcommand{\hlcom}[1]{\textcolor[rgb]{0.625,0.125,0.9375}{\textsl{#1}}}%
+\renewcommand{\code}[1]{\textsl{\texttt{#1}}}
+
+\DeclareGraphicsExtensions{.pdf,.png,.jpg,.JPG}
+\graphicspath{{Fig/}}
+
+<<"prelim",child="00-Prelim.Rnw">>=
+@
+
+<<setFigPath,include=FALSE>>=
+.infile <- sub("\\.Rnw$", "", knitr::current_input())
+knitr::opts_chunk$set(fig.path = paste0('Fig/', .infile, "_")) #$
+session <- sub("^0+", "", sub("[^[:digit:][:alpha:]].*$", "", .infile))
+@ 
+
+
+\usepackage{natbib}
+\bibliographystyle{chicago}
+
+\title{\Large \input{title.tex}
+  \Huge \red{Session \Sexpr{session}:\\[10pt]
+    Graphics}}  %%% Change needed
+    
+<<line_034_,include=FALSE>>=
+rm(session)
+@
+
+\input{authorAndDate}
+
+\begin{document}
+\setkeys{Gin}{keepaspectratio=TRUE}
+
+\begin{slide}
+\slidepagestyle{empty}
+
+  {\color{darkgreen}\maketitle}
+\end{slide}
+
+\begin{slide}
+\slidepagestyle{plain}
+\setcounter{slide}{1}
+
+\tableofcontents
+\newslide
+\section{Graphics in \R}
+\label{sec:Graphics in R}
+\begin{itemize}
+  \item The \rcode{grDevices} package handles all communication with external
+    graphics devices, as well as providing some useful tools and resources
+  \item Traditional, or \emph{base} graphics uses the \rcode{graphics} package,
+    which communicates directly with \rcode{grDevices} and outputs to the open
+    graphics channel immediately.
+  \item The \rcode{grid} package provides a series of tools to construct
+    \emph{graphical objects}, for which the standard \rcode{print} method
+    leads to graphical, rather than printed, output.
+  \item Modern graphical packages, such as \rcode{lattice} and \rcode{ggplot2}
+    work through \rcode{grid}: they produce objects for which only printing
+    produces graphical output.
+\end{itemize}
+% \newslide
+% <<echo=FALSE>>=
+% plot.new()
+% par(mar = rep(0, 4))
+% plot(0:1, 0:1, type = "n", asp = 1, ann = FALSE, axes = FALSE)
+% pu <- par("usr")
+% rect(pu[1],pu[3],pu[2],pu[4],fill = alpha("sky blue", 0.25), colour = "transparent")
+% z0 <- complex(1,0.5,0.125)
+% zg <- complex(1,0.25, 0.45)
+% zr <- complex(1,0.75, 0.45)
+% zp <- complex(1,(0.5+0.75)/2-0.07, 0.75)
+% zl <- complex(1,(1 + 0.75)/2+0.07, 0.75)
+% zt <- complex(1, 0.75, 0.875)
+% zm <- complex(1, 0.125, 0.825)
+% zz <- c(z0, zg, zr, zp, zl, zt, zm)
+% circles(zz, radii = 1, maxradius = 1.5)
+% text(zz[-6], c("grDevices", "graphics", "grid",
+%            "ggplot2", "lattice",
+%            "most\nplot()\nmethods"), family = "mono", font = 2,
+%      col = "brown")
+% text(zt, "TurtleGraphics", family = "mono", font = 2, cex = 0.75,
+%      col = "brown")
+% arrows(zg, z0, gap = 15)
+% arrows(zr, z0, gap = 15)
+% arrows(zp, zr, gap = 15)
+% arrows(zl, zr, gap = 15)
+% arrows(zt, zr, gap = 15)
+% arrows(zm, zg, gap = 15)
+% text("top left", "Relationships between some graphics packages", family = "serif", font=2)
+% @
+\newslide
+<<line_101_,echo=FALSE>>=
+plot.new()
+eps <- 0.32
+delta <- 0.125
+theta <- 0.01190476
+par(mar = rep(0, 4), usr = c(0, 1 + eps + theta, 0-theta*2, 1 + delta/2),
+    family = "mono", font = 2, cex = 1)
+x <- c(1/3, 2/3, 2/3, 1/3)
+y <- c(0, 0, 1/5, 1/5)
+polygon(x, y, density = 0)
+text(mean(x), mean(y), "grDevices")
+text(mean(x), mean(y)/2.5, "(R core)", cex = 0.7, family = "serif", font = 3)
+
+segments(mean(x), 1/5, mean(x), max(y + 2/3) + delta, lwd = 3, col = "red")
+text((min(x - 1/4 - 1/14) + mean(x))/2,
+     max(y + 2/3) + delta/2,
+     "Base Grahpics", family = "serif", font = 4, cex = 1)
+text((max(x + 1/4 + 1/12 + eps) + mean(x))/2,
+     max(y + 2/3) + delta/2,
+     "Grid Grahpics", family = "serif", font = 4, cex = 1)
+
+polygon(x - 1/4 - 1/14, y + 1/3, density = 0)
+text(mean(x) - 1/4 - 1/14, mean(y) + 1/3, "graphics")
+text(mean(x) - 1/4 - 1/14, mean(y)/2.5 + 1/3, "(R core)", cex = 0.7, family = "serif", font = 3)
+arrows(1/4 - 1/14, 1/3, 1/3 + 1/12, 1/5, angle = 15, length=2, gap=2)
+
+polygon(x + 1/4, y + 1/3, density = 0)
+text(mean(x) + 1/4, mean(y) + 1/3, "grid")
+text(mean(x) + 1/4, mean(y)/2.5 + 1/3, "(P. Murrell)", cex = 0.7, family = "serif", font = 3)
+arrows(1/4 + 1/2, 1/3, 2/3 - 1/12, 1/5, angle = 15, length=2, gap=2)
+
+polygon(x + 1/4 + 1/12 + eps, y + 1/3, density = 0)
+text(mean(x) + 1/4 + 1/12 + eps, mean(y) + 1/3, "gridExtra")
+text(mean(x) + 1/4 + 1/12 + eps, mean(y)/2.5 + 1/3, "(P. Murrell)", cex = 0.7, family = "serif", font = 3)
+arrows(x[1] + 1/4 + 1/12 + eps, mean(y) + 1/3, max(x + 1/4), mean(y) + 1/3, angle = 15, length=2, gap=2)
+
+polygon(x + 1/4 + 1/12 + eps, y + 2/3, density = 0)
+text(mean(x) + 1/4 + 1/12 + eps, mean(y) + 2/3, "lattice")
+text(mean(x) + 1/4 + 1/12 + eps, mean(y)/2.5 + 2/3, "(D. Sarkar)", cex = 0.7, family = "serif", font = 3)
+arrows(1/4 + 1/2 + 1/12 + eps, 2/3, max(x + 1/4), 1/5 + 1/3, angle = 15, length=2, gap=2)
+
+polygon(x - 1/6 + 1/10 + eps, y + 2/3, density = 0)
+text(mean(x) - 1/6 + 1/10 + eps, mean(y) + 2/3, "ggplot2")
+text(mean(x) - 1/6 + 1/10 + eps, mean(y)/2.5 + 2/3, "(H. Wickham)", cex = 0.7, family = "serif", font = 3)
+## arrows(mean(x) - 1/6 + 1/10 + eps, 2/3, 2/3, 1/5 + 1/3, angle = 15, length=2, gap=2)
+arrows(mean(x) - 1/6 + 1/10 + eps, 2/3, mean(x) - 1/6 + 1/10 + eps, 1/5 + 1/3, angle = 15, length=2, gap=2)
+
+polygon(x - 1/4 - 1/14, y + 2/3, density = 0)
+arrows(mean(x) - 1/4 - 1/14, 2/3, mean(x) - 1/4 - 1/14, 1/5 + 1/3, angle = 15, length=2, gap=2)
+text(mean(x) - 1/4 - 1/14, mean(y) + 2/3 + 1/35, "Most plot()", cex = 0.8)
+text(mean(x) - 1/4 - 1/14, mean(y) + 2/3 - 1/35, "methods", cex = 0.8)
+# box()
+@
+
+\subsection{Some differences}
+\label{sub:Some differences}
+
+\begin{itemize}
+  \item \emph{Traditional graphics} use ``The Painter's model'': output is produced immediately
+    as a side-effect of the function call.  The only way to change the graphic is to
+    re-run the script from scratch.  The value returned by the function is not printed
+    and often of no interest.
+    
+    Hence functions like \rcode{plot}, \rcode{lines}, \rcode{points}, \&c
+    work equally well when called within other functions as they do when called from the
+    command line.
+  \item \emph{\rcode{grid}-based graphics} usually have \emph{no} side effects; calls to
+    functions build up a \emph{graphical object} to guide the graphic when eventually the
+    object is \rcode{print}ed.
+    
+    In \rcode{ggplot2}, (and to a lesser extent in \rcode{lattice}), objects are built up
+    \emph{incrementally} using an `overloaded' plus (+) operator.
+    
+    Hence \rcode{ggplot} and \rcode{lattice} plots, if called within
+    functions either have to return the graphics object for later printing, or call the
+    \rcode{print} function explicitly within the function itself (NOT recommended!)
+\end{itemize}
+\newslide
+\section{Grammar of graphics}
+\label{sec:Grammar of graphics}
+
+\subsection{Some Terminology}
+\label{sub:Some Terminology}
+
+
+\begin{description}
+  \item[Aesthetics] Properties of the display which can be used to represent variables
+    to be displayed.  $x-$ and $y-$axes are primary, but \emph{colours, sizes, shapes, grouping},
+    and many others are available
+  \item[Geoms] Devices used to establish the association between variables to be displayed.
+  \item[Stats] Nothing to do with statistics.  Transformations of the data to allow the
+    modify, or specify, the precise form of the association.
+    
+    Most \emph{geom}s imply a default \emph{stat}; conversely most \emph{stat}s imply a 
+    default \emph{geom}.
+  \item[Scales] A control mechanism for aesthetics such as \emph{colours, `fills', sizes, shapes}, 
+    to establish a desired effect.
+  \item[Guides] Devices for meta-information, such as legends.
+  \item[Faceting] The partition of a display into a gridded set of panels, each displaying
+    one section of the data, usually with a related context.
+  \item[Themes] Background properties of the display; the `look and feel' properties independent
+    of the information being displayed.
+\end{description}
+\subsection{The structure of a \rcode{ggplot} object}
+\label{sub:The structure}
+
+A \rcode{ggplot2} object starts with a call to the function \rcode{ggplot()} 
+(\emph{not} \code{ggplot2()}) which
+usually contains the name of the data frame from which most variables used in the 
+display are to come.  (It is not necessary to use variables in a data frame, but it is
+highly recommended you do so.)
+
+We build an example in small increments to see the process.
+\newslide
+<<line_215_,out.height="0.45\\textheight">>=
+boston <- Boston %>% ## ?Boston gives the full documentation
+  within({
+    Riverside <- recode(chas, `0` = "No", `1` = "Yes")
+    Poverty <- sqrt(lstat)
+  }) %>% 
+  select(Price = medv, Rooms = rm, Poverty, Riverside) ## raname
+gg_object <- ggplot(boston)  ## embryonic ggplot object;
+gg_object + theme_grey()     ## blank canvas at this stage
+@
+\newslide
+What happens when we nominate something for the axes?
+
+<<line_229_,fig.height=5,fig.width=7,out.height="0.65\\textheight">>=
+gg_object <- gg_object + aes(x = Rooms, y = Price)
+gg_object + theme_grey()  ## we get an axis system, but ...
+@
+\newslide
+Now stipulate a few more details:
+<<line_235_,fig.height=5,fig.width=7,out.height="0.65\\textheight">>=
+gg_object <- gg_object + aes(colour = Poverty)       ## use colour, but how?
+gg_object + geom_point() + scale_colour_viridis_c()  ## 'colour-blind friendly'
+@
+\newslide
+Step back and do a simple plot that says something
+<<line_241_,fig.height=5,fig.width=7,out.height="0.65\\textheight">>=
+ggplot(boston) + aes(x = Rooms, y = Price) + geom_point(colour = "steelblue") +
+  labs(x = "Mean number of rooms", y = "Median house value in $000s")
+@
+The object has not been saved, but has been printed and discarded.
+\newslide
+See how \code{stat}s and \code{geom}s can be used as alternatives.
+<<line_248_,fig.height=5,fig.width=7,out.height="0.65\\textheight">>=
+gg_object <- gg_object + labs(x = "Mean number of rooms", 
+                              y = "Median house value in $000s")
+gg_object + geom_hex(bins = 35) + scale_fill_viridis_c() 
+@
+\newslide
+Now a similar plot using \code{stat} and implying \code{geom}:
+<<line_255_,fig.height=6,fig.width=7,out.height="0.65\\textheight">>=
+gg_object + stat_bin_hex(bins = 35) + scale_fill_distiller(palette = 3) +
+  theme_bw() + theme(legend.position = "bottom")
+@
+
+
+\newslide
+\subsection{A cars example}
+\label{sub:A cars example}
+
+The \href{https://en.wikipedia.org/wiki/1973_oil_crisis}{oil crisis of 1973} led to a
+sudden and extreme rise in the price of petrol in the USA, particularly, and in turn
+led to greater attention to the fuel economy of new cars.  The \rcode{datasets} package
+in \R also has a data set, \rcode{mtcars}, of data from models released in 1973.  The
+\rcode{MASS} package has a data set \rcode{Cars93} containing data from models released in 1993.
+Our job will be compare the fuel performance of vehicles from these two data sets.
+<<line_271_>>=
+sapply(c("mtcars", "Cars93"), find) %>% noquote
+@
+\newslide
+First look at the marginal relationship between miles/gallon and weight:
+<<line_276_,fig.height=5,fig.width=10,out.height="0.6\\textheight">>=
+# library(gridExtra)  ## library(patchwork) is an alternative
+plt73 <- ggplot(mtcars) + aes(x = wt, y = mpg) + 
+  geom_point(colour = "steelblue") + labs(title="1973")
+plt93 <- ggplot(Cars93) + aes(x = Weight, y = MPG.city) + 
+  geom_point(colour = "brown") + labs(title="1993")
+plt73 + plt93
+@
+\newslide
+Adding a smoother allows the pattern to be more clearly seen:
+<<line_286_,fig.height=5,fig.width=10,out.height="0.6\\textheight">>=
+sm <- geom_smooth(method = "loess", se = FALSE,
+                  colour = "darkgreen", formula = y ~ x)
+(plt73 + sm) + (plt93 + sm)
+@
+Clearly MPG is not a good scale to use. (Why?)
+\newslide
+A Box-Cox transform suggest an inverse scale:
+<<line_296_,out.height="0.8\\textheight">>=
+modl93 <- lm(MPG.city ~ Weight, Cars93)  ## assume we want a straight line
+box_cox(modl93)                   ## traditional graphics, in WWRUtilities
+@
+\newslide
+Consider a GPM (Gallons/100 miles) scale instead.
+<<line_302_,fig.height=5,fig.width=10,out.height="0.6\\textheight">>=
+plt73 <- ggplot(mtcars) + aes(x = wt, y = 100/mpg) + 
+  geom_point(colour = "steelblue") + labs(title="1973") 
+plt93 <- ggplot(Cars93) + aes(x = Weight, y = 100/MPG.city) + 
+  geom_point(colour = "brown") + labs(title="1993")
+(plt73 + sm) + (plt93 + sm)
+@
+\newslide
+How does a straight line look?
+<<line_313_,fig.height=5,fig.width=10,out.height="0.6\\textheight">>=
+sml <- geom_smooth(method = "lm", se = FALSE, 
+                   colour = "darkgreen", formula = y ~ x)
+(plt73 + sml) + (plt93 + sml)
+@
+Since the scales are different, it is a bit hard to see if the lines look parallel.
+\newslide
+Putting the two data sets together:
+<<line_321_,out.lines=8>>=
+options(stringsAsFactors = FALSE)  ## no auto conversion
+cu.in2litres <- 0.0163871 ## conversion factor
+data73 <- with(mtcars, {
+  data.frame(Make = row.names(mtcars), Year = "1973", GPM = 100/mpg, 
+             Displacement = disp * cu.in2litres, Weight = wt * 1000)
+})
+data93 <- with(Cars93, {
+  data.frame(Make = as.character(Make), Year = "1993", GPM = 100/MPG.city, 
+             Displacement = EngineSize, Weight = Weight)
+})
+(Cars <- bind_rows(data73, data93) %>% arrange(GPM))
+@
+\newslide
+Now put the two together in a single display with the same coordinate system:
+<<line_336_,fig.height=5,fig.width=8,out.height="0.5\\textheight">>=
+plt <- ggplot(Cars) + aes(x = Weight, y = GPM, colour = Year) +
+  geom_point() + geom_smooth(method = "lm", se = FALSE, formula = y ~ x) +
+  labs(title = "Fuel consumption rates, 1973 and 1993",
+       x = "Weight of vehicle (in lbs)", y = "Fuel consumption (Gals/100 miles)") + 
+  theme(plot.title = element_text(hjust = 0.5)) +  ## centre the title
+  scale_colour_manual(values = c(`1973` = "steelblue", `1993` = "brown"))
+plt
+@
+\newslide
+Parallel lines look very convincing.  The gap represents the increase in fuel
+efficiency.  Now put them side-by-side
+<<line_348_,fig.height=5,fig.width=10,out.height="0.6\\textheight">>=
+plt + facet_wrap(~ Year, nrow = 1) + 
+  theme(legend.position = "none", plot.title = element_text(hjust = 0.5))
+@
+\newslide
+Using engine capacity (`displacement') rather than weight offers a different
+story:
+<<line_355_,fig.height=4.5,fig.width=7,out.height="0.55\\textheight">>=
+plt2 <- ggplot(Cars) + aes(x = Displacement, y = GPM, colour = Year) +
+  geom_point() + geom_smooth(method = "lm", se = FALSE, formula = y ~ x) +
+  labs(title = "Fuel consumption rates, 1973 and 1993",
+       x = "Engine size (in litres)", y = "Fuel consumption (Gals/100 miles)") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  scale_colour_manual(values = c(`1973` = "steelblue", `1993` = "brown"))
+plt2
+@
+\newslide
+Fuel consumption grows at almost identical rates with respect to
+engine size for both years.  What is going on?  
+
+One clue might be to
+check the relationship between engine size and weight.
+
+<<line_371_,out.height="0.8\\textheight">>=
+plt3 <- ggplot(Cars) + aes(x = Weight, y = Displacement, colour = Year) +
+  geom_point() + geom_smooth(method = "lm", se = FALSE, formula = y ~ x) +
+  labs(title = "Engine size vs vehicle weight, 1973 and 1993", 
+       x = "Vehicle weight (in lbs)", y = "Engine size (in litres)") +
+  scale_colour_manual(values = c(`1973` = "steelblue", `1993` = "brown")) +
+  theme_minimal() +   ## take care of background
+  theme(plot.title = element_text(hjust = 0.5)) ## must come after theme_minimal()
+plt3
+@
+
+Could it be that the slight gain in fuel efficiency over the period
+was achieved mainly by making the engines smaller and hence less powerful
+in vehicles of comparable weight?
+\newslide
+Finally, what are the makes of the bigger cars?
+<<line_387_,out.height="0.7\\textheight">>=
+library(ggrepel)  ## add-on package to ggplot2
+bigCars <- Cars %>% filter(Displacement > 5.5)
+plt3 + geom_text_repel(data = bigCars, aes(label = Make), 
+                       size = 3, colour = "black") + 
+  theme_bw() + theme(plot.title = element_text(hjust = 0.5))
+@
+\newslide
+\section{A contour plot}
+\label{sec:A contour plot}
+
+A non-linear regression model with two parameters: The Stormer Data
+\begin{displaymath}
+  T = \frac{\beta V}{W - \theta} + \varepsilon, \qquad \varepsilon \sim \mathrm{N}(0, \sigma^2)
+\end{displaymath}
+The data:
+<<storm, fig.height=6, fig.width=8,  out.height="0.45\\textheight">>=
+ggplot(mutate(Stormer, Weight=factor(Weight))) +
+  aes(x=Viscosity, y=Time, group=Weight) + geom_line(colour="steelblue") + 
+  geom_point(aes(shape=Weight), size=2) + theme(legend.position=c(0.1, 0.85))
+@
+\newslide
+
+Fitting the model:
+<<line_404_>>=
+fm <- nls(Time ~ beta*Viscosity/(Weight - theta), Stormer, 
+          start = list(beta = 30, theta = 2))
+summary(fm)$coef
+bt <- coef(fm)
+se <- sqrt(diag(vfm <- vcov(fm)))
+cov2cor(vfm)
+@
+\newslide
+% Parameter estimates are highly negatively correlated.
+
+Look more closely at the least squares surface as a function of $\beta$ and $\theta$:
+<<line_416_>>=
+ssq <- function(beta, theta) {
+  sum((Time - beta*Viscosity/(Weight - theta))^2)
+}
+environment(ssq) <- as.environment(Stormer) ## get Weight &c
+parent.env(environment(ssq)) <- baseenv() ## get sum(), ^, &c
+SSQ <- Vectorize(ssq)   ## vectorization on the fly!
+@
+Evaluate this on a wide grid covering the MLE:
+<<line_428_>>=
+beta0  <- bt[["beta"]];  bspan <- 5*se[[ "beta"]]
+theta0 <- bt[["theta"]]; tspan <- 5*se[["theta"]]
+
+Beta  <- seq(beta0 - bspan, beta0 + bspan, length.out = 201)
+Theta <- seq(theta0- tspan, theta0+ tspan, length.out = 201)
+
+RSSq <- expand.grid(beta = Beta, theta = Theta) %>% 
+  within({
+    Rssq <- SSQ(beta, theta)
+    logF <- log(Rssq) - log(ssq(beta0, theta0))
+  })
+@
+\newslide
+Now for the display.
+<<line_441_>>=
+ggplot(RSSq) + aes(x = beta, y = theta) +
+  geom_raster(aes(fill = logF)) + 
+  geom_point(x = beta0, y = theta0, shape = 3, size = 3)+
+  scale_fill_continuous(high = "lemon chiffon", low = "#DF536B", 
+                        name = "log(RSS/min(RSS))") +
+  stat_contour(aes(z = logF), 
+               colour = "black", 
+               size = 0.25,
+               breaks = c(1/8, (1:7)/2)) +
+  labs(x = expression(beta), y = expression(theta),
+       title = expression(Time == ' '*frac(beta%*%Viscosity, 
+                                           (Weight-' '*theta))+epsilon)) + 
+  theme(plot.title = element_text(hjust = 0.5),
+        legend.position = "bottom")
+@
+\newslide
+A similar display with traditional graphics.  The data has to be in a different form first:
+<<trad,>>=
+pal <- colorRampPalette(c("#DF536B", "lemon chiffon"))
+logF <- log(outer(Beta, Theta, SSQ))
+logF <- logF - log(ssq(beta0, theta0))
+image(x = Beta, y = Theta, z = logF, col = pal(250), 
+      xlab = expression(beta), ylab = expression(theta),
+      main = expression(Time == ' '*frac(beta%*%Viscosity,
+                                         (Weight-' '*theta))+epsilon))
+contour(x = Beta, y = Theta, z = logF, levels = c(1/8, (1:7)/2), add = TRUE)
+points(beta0, theta0, pch = 3, cex = 2)
+@
+
+
+\newslide
+\phantomsection
+\addcontentsline{toc}{section}{Session information}
+\section*{Session information}
+\label{sec:sessinfo}
+
+\begin{tiny}
+<<sessionInfo,echo=FALSE,results="asis",out.lines=200>>=
+cat("{\\bf\nDate: ", format(Sys.Date()), "\n}") 
+toLatex(sessionInfo(), locale = FALSE)
+@ %def
+\end{tiny}
+
+
+
+\end{slide}
+
+\end{document}
+

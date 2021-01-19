@@ -1,0 +1,393 @@
+\documentclass{seminar}
+\usepackage[utf8]{inputenc}
+
+\usepackage{RlogoNew}
+\usepackage{Rcolors}
+
+\usepackage{tabularx}
+\usepackage{SeminarExtra}
+\usepackage{op}
+
+\renewcommand{\hlcom}[1]{\textcolor[rgb]{0.625,0.125,0.9375}{\textsl{#1}}}%
+\renewcommand{\code}[1]{\textsl{\texttt{#1}}}
+\newcommand{\spreadout}{$\vphantom{\big\{}$\xspace}
+
+\DeclareGraphicsExtensions{.pdf,.png,.jpg,.JPG}
+\graphicspath{{Fig/}}
+
+<<"prelim",child="00-Prelim.Rnw">>=
+@
+
+<<setFigPath,include=FALSE>>=
+.infile <- sub("\\.Rnw$", "", knitr::current_input())
+knitr::opts_chunk$set(fig.path = paste0('Fig/', .infile, "_")) #$
+session <- sub("^0+", "", sub("[^[:digit:][:alpha:]].*$", "", .infile))
+@ 
+
+
+\usepackage{natbib}
+\bibliographystyle{chicago}
+
+\title{\Large \input{title.tex}
+  \Huge \red{Session \Sexpr{session}:\\[10pt]
+    Recursive Programming:\spreadout Solving Sudoku in \R}}  %%% Change needed
+
+\input{authorAndDate}
+
+\begin{document}
+\setkeys{Gin}{keepaspectratio=TRUE}
+
+\begin{slide}
+\slidepagestyle{empty}
+
+  {\color{darkgreen}\maketitle}
+\end{slide}
+
+\begin{slide}
+\slidepagestyle{plain}
+\setcounter{slide}{1}
+
+\tableofcontents
+
+\newslide
+\vspace{10pt}
+\includegraphics[width = \textwidth]{Kingfishers_Heron_Island}
+\newslide
+
+\section{Environments}
+\label{sec:eniron}
+\begin{itemize}
+\item An \emph{unordered collection} of \red{name-value pairs},
+  providing a \emph{primary context} for an operation or computation
+  in \R.  They are objects in their own right, and may be manipulated
+  as such.
+\item They are like \texttt{list}s, in that their values may be
+  extracted or replaced by \emph{name} using either the
+  \texttt{\$name} or \texttt{[["name"]]} operators, (but \emph{not} by
+  numerical indices!).
+\item They are \emph{unlike} lists in that they are \emph{not copied} on
+  assignment.  This makes them tricky!
+\item They are internally represented a hash tables, making them very
+  efficient for access and replacement.
+\item Most junior \R programmers are unaware of the concept, usually
+  without negative results.
+\end{itemize}
+
+\newslide
+``Hello world'' examples.
+<<e1,out.height="1.75in",fig.height=4,fig.width=5.5>>=
+e1 <- new.env()
+e1$x <- 1:10
+e1$y <- runif(10)
+ls(envir = e1)
+evalq(plot(x, y, type = "b", ylim = 0:1,
+           col = "steel blue", main = "Random"), e1); grid(lty="solid")
+e2 <- e1
+e2$y <- sort(e2$y)
+form <- y ~ x
+environment(form) <- e1  ## yes, e1.  This is not a typo ...
+form  ## enclosing environment given an address, not a name.
+plot(form, ylim=0:1, col="blue", type="b", main="Sorted"); grid(lty="solid")
+@ 
+\newslide
+An example.  The Box-Cox family of transformations.
+\begin{displaymath}
+  y^{(\lambda)} =
+  \begin{cases}
+    \frac{y^\lambda - 1}{\lambda} & \text{if $\lambda \neq 0$}\\
+    \log y & \text{if $\lambda = 0$}
+  \end{cases}
+\end{displaymath}
+<<e2>>=
+tBoxCox <- local({  ## An explicit enclosing environment...
+  t1 <- function(y, lambda) (y^lambda - 1)/lambda ## |lambda| > eps
+  t2 <- function(y, lambda) {  ## |lambda| <= eps, use power series...
+    logy <- log(y)
+    ly <- lambda*logy
+    logy*(1 + ly/2*(1 + ly/3*(1 + ly/4*(1 + ly/5))))
+  }
+  function(y, lambda, eps = 1/250) 
+      with(data.frame(y = y, lambda = lambda),  ## ensure equal length
+           ifelse(abs(lambda) > eps, t1(y, lambda), t2(y, lambda)))
+})
+@ 
+\newslide
+Application: simultaneous testing of transformations
+<<e3>>=
+library(fractional)
+(lambda <- seq(-2, 5/3, length.out = 12))
+tst <- lm(outer(MPG.city, lambda, tBoxCox) ~ Weight+Type+Origin, Cars93)
+dim(rs <- resid(tst))  ## residual matrix
+par(mfrow=n2mfrow(length(lambda)), mar=rep(0,4), bg=alpha("alice blue", 0.5))
+for(j in seq_along(lambda)) {
+  qqnorm(rs[,j], axes = FALSE, ann = FALSE)
+  qqline(rs[,j], col = "red")
+  grid(lty = "solid")
+  par(usr=c(0,1,0,1))
+  text(0.05, 0.95, bquote(lambda == .(as.character(fractional(lambda[j])))),
+       cex = 1.5, adj = 0)
+  box(col = "grey")
+}
+@ 
+\newslide
+Linear and spline interpolation.
+<<e4,fig.show="hold">>=
+with(e1, {  ## works with environments too!
+  linInt <<- approxfun(x, y, rule = 2)  ## "flat" extrapolation
+  splInt <<- splinefun(x, y, method = "hyman") ## monotonic spline
+})
+linInt
+ls(envir = environment(linInt))  ## in the sack...
+plot(form, xlim = c(0, 11), ylim = c(-0.15, 1.15))
+curve(linInt, add = TRUE, col="steel blue", n = 500)
+curve(splInt, add = TRUE, col="rosy brown", n = 500)
+legend("topleft", c("linear interpolation", "monotonic spline"), 
+       bty = "n", lty = "solid", lwd = 2.5, 
+       col = c("steel blue", "rosy brown"))
+grid(lty="solid")
+@ 
+\newslide
+A more practical use: storing data with a function.
+<<a0,include=FALSE>>=
+library(english)
+english.object_size <- function(x, ...) {
+  x <- unclass(x)
+  v <- english:::english.numeric(x)
+  cat(as.character(v), "bytes\n")
+  invisible(x)
+}
+@ 
+<<a1>>=
+str(Oz)
+Aus <- local({
+  Oz <- Oz  ## keep a copy here!
+  
+  function (add = FALSE, xlim = c(112.913865, 154.417058),
+                         ylim = c(-43.738846, -9),
+            xlab = "", ylab = "", axes = FALSE, ...) {
+### the xy-list 'Oz' is held in the local environment of this function
+    if (!add) {
+      plot(xlim, ylim, asp = 1, type = "n", xlab = xlab, ylab = ylab, 
+           axes = axes, ...)
+    }
+    lines(Oz, ...)
+  }
+})
+
+ls(envir = environment(Aus))
+
+english(object.size(Aus))                  ## not the full story!
+english(object.size(serialize(Aus, NULL))) ## more honest!
+
+## what it actually does!
+Aus(xlim = c(140, 155), ylim = c(-30, -9), col = "rosy brown")
+box()
+@ 
+\newslide
+
+\subsection*{Super-assignment}
+\label{sec:superassignment}
+
+\begin{itemize}
+\item The \verb|<<-| assignment operator, assigns \emph{outside} the
+  environment in which it is invoked\footnote{This makes it a
+    side-effect, and side-effects are potentially dangerous.}.
+\item An assignment such as
+  <<sa1,eval=FALSE>>=
+  x <<- sqrt(y)
+  @ 
+  would 
+  \begin{itemize}
+  \item look for \verb|y| in the current environment (and from there
+    back though its \emph{lexical scoping}) to form the square roots,
+    but
+  \item look for an \verb|x| \emph{outside} the current environment to
+    put the result.  
+    
+    If it found none, the value would be put in the \emph{working
+      environment} (making it dangerous!)
+  \end{itemize}
+
+\end{itemize}
+\newslide
+<<sa2>>=
+fn <- local({
+  x <- 0     ## to receive 
+  n <- 0     ## super-assigned values
+  function(y = x) {
+    x <<- y
+    n <<- n + 1
+    return(c(No = n, Value = x, Square = y^2))
+  }
+})
+fn()
+fn(3:5)      
+fn()
+@ 
+\newslide
+\section{How to spoil a Sudoku puzzle using \R}
+\label{sec:how-solve-sudoku}
+Example:
+
+<<s1,out.height="0.5\\textheight",fig.height=7,fig.width=7>>=
+library(sudokuAlt)
+fetchAUGame(difficulty = "tough") %>% solve %>% plot  
+@ 
+
+\newslide
+A bigger example, $n = 4$. This is a generalized Latin Square design:
+<<s2,out.height="0.75\\textheight",fig.height=8,fig.width=8,x=set.seed(1234)>>=
+seedGame(4) %>% solve %>% plot
+@ 
+
+\newslide
+Strategy:
+\begin{itemize}
+\item Represent the game externally as an $n^2\times n^2$ matrix,
+  numeric or character, but internally as a \emph{numerical} array of
+  dimension $n\times n\times n\times n$, with empty cells \texttt{NA}.
+  
+  Set up tools for converting from one to the other.
+\item Set up tools for checking if the \emph{Sudoku} constraints have
+  been violated (for any complete game, or any tentative solution).
+\item The main process is recursive. The function
+  \texttt{findSolution} is given a progressively solved game and does
+  the following:
+  \begin{itemize}
+  \item Check the game for validity.  If invalid, return
+    \texttt{FALSE}, otherwise continue.
+  \item Check if the game has any missing cells.  If not, return it as
+    the solution.  Otherwise:
+    \begin{itemize}
+    \item Check each missing cell for possible entries, and count them.
+    \item If any cell has \emph{no} possible entry, the game is
+      unsolvable; return \texttt{FALSE}.
+    \item If there are any cells with only \emph{one} possible entry,
+      fill them, and check the game.  
+      
+      If invalid, the game is
+      unsolvable; return \texttt{FALSE}.  
+      
+      If still valid, resume the check for missing cells.
+      
+      If there are none, the game is solved, and return the solution.
+    \item If here are cells with multiple possible entries, choose one
+      of them with the fewest possible.  Loop over them, as follows.
+      
+      Fill the cell with the first possibility, and recursively call
+      \texttt{findSolution} to see if there is a solution.  If so
+      return it.
+      
+      If not, proceed to the next possibility, and try again.
+      
+      If no possibility leads to a solution, there is none.  Return \texttt{FALSE}.
+      
+    \end{itemize}
+
+  \item If a solution has been found by \texttt{findSolution} convert
+    it back to a matrix and return it; if none has been found the game
+    is unsolvable: return \texttt{NULL}.
+
+  \end{itemize}
+
+\end{itemize}
+\newslide
+The code.  This speaks for itself.
+<<s3,eval=FALSE,tidy=FALSE>>=
+solveGame <- function(game) {
+  n <- as.integer(round(sqrt(nrow(game))));  stopifnot(n > 1 && n < 6)
+  
+  set <- if(n <= 3) as.character(1:n^2) else LETTERS[1:n^2] ## legals
+  storage.mode(game) <- "character"
+  is.na(game[!(game %in% set)]) <- TRUE
+  nSet <- 1:n^2  ## work in integers
+    
+  toMatrix <- function(game) {  ## inverse of toArray
+    game[] <- set[game]
+    dim(game) <- c(n, n)^2
+    game
+  }
+  
+  toArray <- function(mat) {  ## inverse of toMatrix
+    array(as.integer(match(mat, set)), dim = c(n,n,n,n))
+  }
+  
+  conflict <- function(section) 
+      any(duplicated(na.omit(as.vector(section))))
+  
+  invalid <- function(game) {
+    for(i in 1:n) for(j in 1:n) {
+      if(conflict(game[,i,,j]) ||  ## 'same block'
+         conflict(game[i,j,,]) ||  ## 'same row'
+         conflict(game[,,i,j]))    ## 'same column'
+          return(TRUE)
+    }
+    FALSE
+  }
+  findSolution <- function(game) {
+    if(invalid(game)) return(FALSE)  ## dead end.  Go back.
+    while(anyNA(game)) {  ## anyNA() is only  in R 3.0.2 and later.
+      holes <- which(is.na(game), arr.ind = TRUE)  ## a splendid trick!
+      nr <- nrow(holes)
+      fills <- vector("list", nr)
+      lengths <- integer(nr)
+      for(j in 1:nr) {
+        i <- holes[j,]
+        fills[[j]] <- setdiff(nSet, c(game[    ,i[2],    ,i[4]],
+                                      game[i[1],i[2],    ,    ],
+                                      game[    ,    ,i[3],i[4]]))
+        
+        lengths[j] <- length(fills[[j]])
+        if(lengths[j] == 0) return(FALSE)
+      }
+      if(any(h <- which(lengths == 1))) {
+        game[holes[h,,drop = FALSE]] <- unlist(fills[h])
+        if(invalid(game)) return(FALSE)
+      } else {  ## only holes with multiple alternatives
+        m <- which.min(lengths)
+        entries <- fills[[m]]
+        pos <- holes[m,,drop = FALSE]
+        for(e in entries) {
+          game[pos] <- e
+          h <- findSolution(game)   ## recursive call
+          if(!isFALSE(h)) return(h) ## Bingo!
+        }
+        return(FALSE)  ## dud game, no solutions!
+      }
+    }
+    game  ## should never reach this point of the code.
+  }
+  
+  ## the business starts here
+  solution <- findSolution(toArray(game))
+  if(isFALSE(solution)) NULL else
+  structure(toMatrix(solution), game = game, class = "sudoku")
+}
+@ 
+
+The short form, \rcode{solve(game)}, is made available by writing a
+method for the \rcode{S3} generic function, \rcode{solve}, in the
+\rcode{base} package.  The method simply uses \rcode{solveGame}.
+<<line_371_>>=
+base::solve
+sudokuAlt:::solve.sudoku
+@
+
+\newslide
+\phantomsection
+\addcontentsline{toc}{section}{Session information}
+\section*{Session information}
+\label{sec:sessinfo}
+\vspace{-10pt}
+\begin{tiny}
+<<sessionInfo,echo=FALSE,results="asis",out.lines=200>>=
+cat("{\\bf\nDate: ", format(today()), "\n}")
+toLatex(sessionInfo())
+@ 
+\end{tiny}
+
+
+\end{slide}
+
+\end{document}
+
