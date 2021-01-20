@@ -1,0 +1,143 @@
+\documentclass[11pt]{article}
+
+\usepackage{fullpage}
+\usepackage{parskip}
+\usepackage[utf8]{inputenc}
+\usepackage{xltabular}
+\usepackage{fouriernc}
+\usepackage{booktabs}
+\usepackage{Rcolors}
+\usepackage{RlogoNew}
+
+\usepackage[yyyymmdd]{datetime}
+\renewcommand{\dateseparator}{-}
+
+
+% \title{Some \RStudio  Keyboard Shortcuts and Tricks}
+% % \author{Bill Venables}
+% % \date{\today}
+% \author{}
+% \date{}
+\begin{document}
+%\maketitle
+\begin{center}
+  \Large Some \RStudio  Keyboard Shortcuts, Tips and Tricks
+\end{center}
+\begin{description}
+\item[NOTE:] The prefixes given here are for \Windows or \Linux
+  operating systems and keyboards.\\
+  The equivalent prefixes for \MacOS are:
+
+  Use \verb|Option | for \verb|Alt|,\\
+  Use \verb|Command| for \verb|Ctrl|\\
+  Use \verb|Shift  | for \verb|Shift|.
+\end{description}
+
+
+\begin{xltabular}{1.0\linewidth}[!htp]{@{}lXX@{}}
+  \toprule
+  \textbf{Key} & \textbf{Source Pane} & \textbf{Console Pane}\\
+  \midrule Alt+Shift+K & Show keyboard shortcut table &
+  Works outside the pane system.\\
+  Ctrl+1 & Shift focus to the source pane&
+  Works outside  the pane system\\
+  Ctrl+2 & Shift focus to the console pane& Works outside
+  the pane system\\
+  Ctrl+Shift+K & `Knit' the current document to either an html, Word
+  or pdf.  (If the current document is an \R script, a temporary
+  \texttt{.Rmd} document is constructed from it on the fly.)  & Works
+  outside
+  of the pane system\\
+  Ctrl+Shift+N & Start a new, unnamed \R script in the source pane&
+  Works outside the   pane system\\
+  (Mouse clicks) & A single click locates the cursor.\par
+  When the cursor is within a word, a double click will select the
+  entire word.  A third click will select the entire line. & Works
+  similarly to source pane\\
+  & When the cursor is located \emph{immediately after} an opening
+  group delimiter: \texttt{(, [, or \{}, a double click will select
+  all text up to, but not including the \emph{matching} closing
+  delimiter. & (This handy feature may be only available in the
+  preview version of
+  \RStudio)\\
+  (Group delimiters) & To insert matching group delimiters in code or
+  documents:\par
+  First select the entire section to be enclosed within the group.\par
+  Then press the required delimiter: \texttt{(, [, or \{}\par
+  Delimiters are inserted before and after the selected text and the
+  cursor located \emph{after} the enclosed group.& Works similarly to
+  source pane\par
+  Note that this also works for inserting matching quote delimiters,
+  \texttt{"}\dots\texttt{"} or \texttt{'}\dots\texttt{'}\\
+  Arrow keys: $\uparrow$, $\downarrow$ & Move around the document in
+  an obvious way. & Move up and down the command history trail for
+  command recall.\par
+  Note particularly that if you start typing a command, Ctrl+$\uparrow$
+  will limit the history recall to all previous commands
+  that \emph{began} in precicsely the same way.\\
+  \midrule Esc & & Interrupt the currently executing \R command,
+  (if possible!)\\
+  Ctrl-Shift-F10 & Restart the \R process, reloading the current
+  workspace, but clearing the search path back to the
+  default.&  Works outside the pane system\\
+  Ctrl+Q & Quit \RStudio altogether &
+  Works outside the pane system\\
+  \midrule
+  Ctrl+A & Select entire document & Select current line\\
+  Ctrl+C & Copy selected text & Copy selected text \\
+  Ctrl+Shift+C & Comment or uncomment selected lines (a
+  toggle) & \\
+  Ctrl+D & Delete all on the current line & Delete the
+  line being typed \\
+  Ctrl+F & Find and replace & \\
+  Ctrl+Shift+F & Find all occurrences of a string in the documents
+  held in the current project folder, or sub-folders & Works outside
+  the pane system.\par (Little known, but very useful!)\\
+  Ctrl+I & Indent the current line and move to the next
+  line.  When held down, this works its way down the document & \\
+  Ctrl+K & Kill to end of line & Kill to end of line \\
+  Ctrl+L & & Clears the console pane\\
+  Ctrl+Shift+M & Insert pipe, \texttt{ \%>\% }& Insert pipe, \texttt{
+    \%>\% }\\
+  Ctrl+S & Save the current document & \\
+  Ctrl+Shift+S & Save the current document and \texttt{source()} it in
+  the console pane& \\
+  Ctrl+X & Cut and copy selection & Cut and copy selection, but
+  limited to the  line currently being typed\\
+  Ctrl+Z & Reverse the previous change.  When typed repeatedly, will
+  reverse several previous changes. & Same action, but limited to the
+  line currently being typed\\
+  Alt+- & Insert assignment operator, \texttt{ <- } & Insert
+  assignment operator, \texttt{ <- }\\
+  Ctrl+Enter & Execute current line, group or selection in the console
+  panel & \\
+  Alt+Shift+I & In an \texttt{Rmd} document, insert a code chunk at
+  the present  point. & \\
+  Ctrl+Alt+Shift+R & In an \R script, insert an \texttt{roxygen2} comment
+  skeleton.\par
+  The cursor must be at the first line of a function definition, and
+  the definition itself must start with a line of the form\par
+  \texttt{name <- function(...) \{...}\par
+  The opening \texttt{\{} is required.&\\
+  \midrule Alt+<letter> & Open menu or sub-menu indicated by
+  \underline{<letter>} on the menu bars& Works outside
+  the pane system\\
+  \bottomrule
+\end{xltabular}
+
+\begin{footnotesize}
+  NOTE: Keyboard shortcuts may be modified from the menu:
+  \begin{center}
+    Tools $\longrightarrow$ Modify keyboard shortcuts\dots (or
+    equavalently \verb|Alt-T|, \verb|Alt-M|)
+  \end{center}
+  You may want to change the \texttt{roxygen} generator from
+  \verb|Ctrl+Alt+Shift+R| to \verb|F12|, (which is currently unused).
+\end{footnotesize}
+
+\end{document}
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: t
+%%% End:
