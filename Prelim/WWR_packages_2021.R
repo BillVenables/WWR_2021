@@ -42,7 +42,7 @@ if(!with(base::version, major >= 4 && minor >= 0)) {
       }
       
       
-      #Bill's original packages not including R Shiny related packages
+      # Bill's original packages not including R Shiny related packages
       
       # .pkgs <- c("C50",            "GGally",         "MASSExtra",      "Rcpp",           
       #            "SOAR",           "devtools",       "data.table",     "doParallel",     
@@ -53,7 +53,7 @@ if(!with(base::version, major >= 4 && minor >= 0)) {
       #            "rbenchmark",     "scales",         "styler",         "sudokuAlt",  
       #            "tidyverse",      "visreg",         "xtable")  
       
-      #Bill's original packages plus Rhetta's R Shiny related packages
+      # Bill's original packages plus Rhetta's R Shiny related packages
       .pkgs <- c("C50",               "GGally",         "MASSExtra",    "Rcpp",           
                  "SOAR",              "devtools",       "data.table",   "doParallel",     
                  "doRNG",             "DT",             "english",      "fractional",     
