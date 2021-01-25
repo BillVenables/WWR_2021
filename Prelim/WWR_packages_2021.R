@@ -37,8 +37,8 @@ if(!with(base::version, major >= 4 && minor >= 0)) {
       cat("Oops!  You don't appear not to have an internet connection!")
     } else {
       if(!is.null(old.packages())) {
-        cat(" Some of your packages have newer versions available.  Update?\n",
-            "Use\n\tupdate.packages(ask = FALSE, checkBuilt = TRUE)\n")
+        cat(" Some of your packages have newer versions available.  To update\n",
+            "use\n\tupdate.packages(ask = FALSE, checkBuilt = TRUE)\n")
       }
       
       
