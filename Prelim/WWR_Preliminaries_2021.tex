@@ -15,8 +15,9 @@
     urlcolor=blue,
 }
 
-\title{Working with \Rlogo:
-  A University of Queensland Advanced Workshop}
+\title{Working with \Rlogo:\\
+  A University of Queensland Advanced Workshop\\[10pt]
+Preliminaries for Participants}
 
 \author{Bill Venables, Data61, CSIRO\\
 Rhetta Chappell, Griffiths University}
@@ -46,7 +47,7 @@ periods.  The best way to learn \R is to \emph{use} \R on real
 problems from your own professional disciplines.
 
 
-\section{Materials and preperation}
+\section{Materials and preparation}
 \label{sec:prep}
 
 \begin{description}
@@ -58,6 +59,10 @@ problems from your own professional disciplines.
 
   Versions of \R older than \R~3.5.0 will not be able to
   handle some of the course data sets.
+
+  [Note that going from \R~3.*.* (or older!) to \R~4.0.* is a major
+  upgrade requiring all your currently installed packages to be
+  re-installed. This may take some time.]
 
 \item[CRAN Packages] Participants should have the required
   capabilities to \emph{install and maintain} \R packages on the
@@ -85,7 +90,7 @@ problems from your own professional disciplines.
 \item[RStudio] The \RStudio API (`application-programmer interface')
   to \R will be assumed and used extensively throughout the
   workshop.\footnote{Other interfaces to \R could be used if
-    paricipants have a particular preference, but some aspects of the
+    participants have a particular preference, but some aspects of the
     work will then not be easily available.  We strongly recommend
     participants have \RStudio installed, whether they use it
     routinely or not.}  As of now, the latest version is
@@ -94,6 +99,13 @@ problems from your own professional disciplines.
   \href{https://rstudio.com/products/rstudio/download/}{here}. The
   free desktop version is adequate.
 
+  To update an existing installation, a good way to begin is to start
+  up \RStudio and go to the menu:
+  \begin{center}
+    \texttt{Help} $\longrightarrow$ \texttt{Check for updates}
+  \end{center}
+  and follow the advice.
+  
   The main materials for the course will be delivered as a complete
   \RStudio~\emph{Project} as a \verb|.zip| file.  This can be
   downloaded and expanded to provide a directory (or folder) that will
@@ -135,7 +147,7 @@ problems from your own professional disciplines.
   open-source software, available for all common operating systems,
   and freely located on the web.  Installation is simple.
 
-  Evetually you may wish to get yourself a free \github (or \gitlab)
+  Eventually you may wish to get yourself a free \github (or \gitlab)
   account to facilitate collaborative working, or to allow access on
   several machines.  Details are left for the reader to investigate.
   
@@ -168,6 +180,9 @@ The recommended set-up process is:
   \item Update your \R to \R~4.0.3, if necessary, and update your
     currently installed packages to the latest CRAN versions.
     
+  \item Make sure you have \RStudio installed and upgraded to the
+    latest release.
+    
   \item From within an \R session, run the script
     \verb|WWR_packages_2021.R| to install any required new packages
     you will need for the workshop.
@@ -175,16 +190,32 @@ The recommended set-up process is:
   \item Download the file \verb|WWR_2021.zip| from the link below and
     expand it to provide the \verb|WWR_2021| folder, where you wish to
     locate it for use as the working directory during the workshop.
+    \begin{description}
+    \item[NOTE 1:] This {\tt .zip} folder will be
+      available on memory sticks at the workshop itself.  So if there
+      is any problem, apart from updating \R itself, it can be fixed
+      at the workshop itself as necessary.
+    \item[NOTE 2:] Users with \git and some experience with using it
+      may prefer to clone the \github repo directly.  The
+      relevant address is
+      \begin{center}
+        \url{https://github.com/BillVenables/WWR_2021}
+      \end{center}
+      Alternatively the folder can be downloaded as a \verb|.zip| from
+      this same address.  You should be able to go to the tab:
+      \begin{center}
+        \texttt{Code} $\longrightarrow$ \texttt{Download ZIP}
+      \end{center}
 
-    \textbf{NOTE:} This {\tt .zip} folder will be available on memory
-    sticks at the workshop itself.  So if there is any problem, apart
-    from updating \R itself, it can be fixed at the workshop itself as
-    neecessary.
-
+    \end{description}
+  \item This should complete your preparations for the workshop.  If
+    you need further help you are free to contact Bill Venables at
+    this email address:
+    \href{mailto:Bill.Venables@gmail.com}{Bill.Venables@gmail.com}.
  
   \end{enumerate}
 
-    This should complete your preparations for the workshop.    
+        
 
 \section{Links}
 \label{sec:links}
