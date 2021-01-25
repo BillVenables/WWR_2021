@@ -43,13 +43,11 @@
   (Mouse clicks) & A single click locates the cursor.\par
   When the cursor is within a word, a double click will select the
   entire word.  A third click will select the entire line. & Works
-  similarly to source pane\\
+  similarly to source pane.\\
   & When the cursor is located \emph{immediately after} an opening
   group delimiter: \texttt{(, [, or \{}, a double click will select
   all text up to, but not including the \emph{matching} closing
-  delimiter. & (This handy feature may be only available in the
-  preview version of
-  \RStudio)\\
+  delimiter. & \\
   (Group delimiters) & To insert matching group delimiters in code or
   documents:\par
   First select the entire section to be enclosed within the group.\par
@@ -87,7 +85,7 @@
   Ctrl+I & Indent the current line and move to the next
   line.  When held down, this works its way down the document & \\
   Ctrl+K & Kill to end of line & Kill to end of line \\
-  Ctrl+L & & Clears the console pane\\
+  Ctrl+L & & Clears the console pane.\\
   Ctrl+Shift+M & Insert pipe, \texttt{ \%>\% }& Insert pipe, \texttt{
     \%>\% }\\
   Ctrl+Shift+P & Display a combined menu of all \RStudio menu items &
@@ -95,8 +93,8 @@
   Entering a string in the text bar allows commands matching that
   string to be displayed.\\
   Ctrl+S & Save the current document & \\
-  Ctrl+Shift+S & Save the current document and \texttt{source()} it in
-  the console pane& \\
+  Ctrl+Shift+S & \texttt{source()} the current document  in
+  the console pane (\emph{without} necessarily saving it)& \\
   Ctrl+X & Cut and copy selection & Cut and copy selection, but
   limited to the  line currently being typed\\
   Ctrl+Z & Reverse the previous change.  When typed repeatedly, will
@@ -131,8 +129,8 @@
   Use \verb|Shift  | for \verb|Shift|.
 \item[NOTE 2:] Keyboard shortcuts may be modified from the menu:
   \begin{center}
-    Tools $\longrightarrow$ Modify keyboard shortcuts\dots (or
-    equavalently \verb|Alt-T|, \verb|Alt-M|)
+    \texttt{\underline{T}ools} $\longrightarrow$ \texttt{\underline{M}odify keyboard shortcuts\dots}\quad (or
+    equavalently \verb|Alt+T  Alt+M|)
   \end{center}
   You may want to change the \texttt{roxygen} generator from
   \verb|Ctrl+Alt+Shift+R| to \verb|F12|, (which is currently unused). 
