@@ -23,15 +23,6 @@
 \begin{center}
   \Large Some \RStudio  Keyboard Shortcuts, Tips and Tricks
 \end{center}
-\begin{description}
-\item[NOTE:] The prefixes given here are for \Windows or \Linux
-  operating systems and keyboards.\\
-  The equivalent prefixes for \MacOS are:
-
-  Use \verb|Option | for \verb|Alt|,\\
-  Use \verb|Command| for \verb|Ctrl|\\
-  Use \verb|Shift  | for \verb|Shift|.
-\end{description}
 
 
 \begin{xltabular}{1.0\linewidth}[!htp]{@{}lXX@{}}
@@ -40,16 +31,15 @@
   \midrule Alt+Shift+K & Show keyboard shortcut table &
   Works outside the pane system.\\
   Ctrl+1 & Shift focus to the source pane&
-  Works outside  the pane system\\
+  Works outside  the pane system.\\
   Ctrl+2 & Shift focus to the console pane& Works outside
-  the pane system\\
+  the pane system.\\
   Ctrl+Shift+K & `Knit' the current document to either an html, Word
   or pdf.  (If the current document is an \R script, a temporary
   \texttt{.Rmd} document is constructed from it on the fly.)  & Works
-  outside
-  of the pane system\\
+  outside the pane system.\\
   Ctrl+Shift+N & Start a new, unnamed \R script in the source pane&
-  Works outside the   pane system\\
+  Works outside the   pane system.\\
   (Mouse clicks) & A single click locates the cursor.\par
   When the cursor is within a word, a double click will select the
   entire word.  A third click will select the entire line. & Works
@@ -72,16 +62,17 @@
   Arrow keys: $\uparrow$, $\downarrow$ & Move around the document in
   an obvious way. & Move up and down the command history trail for
   command recall.\par
-  Note particularly that if you start typing a command, Ctrl+$\uparrow$
-  will limit the history recall to all previous commands
+  Note particularly that if you start typing a command,
+  Ctrl+$\uparrow$ will limit the history recall to all previous
+  commands
   that \emph{began} in precicsely the same way.\\
   \midrule Esc & & Interrupt the currently executing \R command,
   (if possible!)\\
   Ctrl-Shift-F10 & Restart the \R process, reloading the current
   workspace, but clearing the search path back to the
-  default.&  Works outside the pane system\\
+  default.&  Works outside the pane system.\\
   Ctrl+Q & Quit \RStudio altogether &
-  Works outside the pane system\\
+  Works outside the pane system.\\
   \midrule
   Ctrl+A & Select entire document & Select current line\\
   Ctrl+C & Copy selected text & Copy selected text \\
@@ -99,6 +90,10 @@
   Ctrl+L & & Clears the console pane\\
   Ctrl+Shift+M & Insert pipe, \texttt{ \%>\% }& Insert pipe, \texttt{
     \%>\% }\\
+  Ctrl+Shift+P & Display a combined menu of all \RStudio menu items &
+  Works outsidt the pane system.\par
+  Entering a string in the text bar allows commands matching that
+  string to be displayed.\\
   Ctrl+S & Save the current document & \\
   Ctrl+Shift+S & Save the current document and \texttt{source()} it in
   the console pane& \\
@@ -113,27 +108,37 @@
   panel & \\
   Alt+Shift+I & In an \texttt{Rmd} document, insert a code chunk at
   the present  point. & \\
-  Ctrl+Alt+Shift+R & In an \R script, insert an \texttt{roxygen2} comment
-  skeleton.\par
+  Ctrl+Alt+Shift+R & In an \R script, insert an \texttt{roxygen2}
+  comment skeleton.\par
   The cursor must be at the first line of a function definition, and
   the definition itself must start with a line of the form\par
   \texttt{name <- function(...) \{...}\par
   The opening \texttt{\{} is required.&\\
   \midrule Alt+<letter> & Open menu or sub-menu indicated by
   \underline{<letter>} on the menu bars& Works outside
-  the pane system\\
+  the pane system.\\
   \bottomrule
 \end{xltabular}
 
-\begin{footnotesize}
-  NOTE: Keyboard shortcuts may be modified from the menu:
+\begin{small}
+\begin{description}
+\item[NOTE 1:] The prefixes given here are for \Windows or \Linux
+  operating systems and keyboards.\\
+  The equivalent prefixes for \MacOS are:
+
+  Use \verb|Option | for \verb|Alt|,\\
+  Use \verb|Command| for \verb|Ctrl|\\
+  Use \verb|Shift  | for \verb|Shift|.
+\item[NOTE 2:] Keyboard shortcuts may be modified from the menu:
   \begin{center}
     Tools $\longrightarrow$ Modify keyboard shortcuts\dots (or
     equavalently \verb|Alt-T|, \verb|Alt-M|)
   \end{center}
   You may want to change the \texttt{roxygen} generator from
-  \verb|Ctrl+Alt+Shift+R| to \verb|F12|, (which is currently unused).
-\end{footnotesize}
+  \verb|Ctrl+Alt+Shift+R| to \verb|F12|, (which is currently unused). 
+\end{description}
+\end{small}
+
 
 \end{document}
 
