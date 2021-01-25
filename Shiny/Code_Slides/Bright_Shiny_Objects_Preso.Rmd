@@ -1,11 +1,11 @@
 ---
 title: "Bright R Shiny Objects"
-author: "Rhetta Chappell"
-date: "22/01/2021"
+author: "Bill Venables, Data61, CSIRO & Rhetta Chappell, RIDL, Griffith University"
+date: "February 2021"
 output:
   html_document: default
   'html_document runtime: shiny': default
-subtitle: Advanced R 2021
+subtitle: "UQ Advanced R 2021"
 runtime: shiny
 ---
 
@@ -14,21 +14,21 @@ knitr::opts_chunk$set(echo = FALSE)
 
 ```
 
-## Overview:
+## Purpose:
 
--   demonstrate how shiny apps, widgets and components can be integrated with .Rmd
+Demonstrate how Shiny apps, widgets and components can be integrated with .Rmd documents ( .html, ioslides, presenter mode)
 
-    -   Demonstration of inline apps:
+-    Demonstration of inline apps:
 
-      -   shinyApp() function
-      
-    -   Demonstration of embedding full apps:
+    -   shinyApp() function
 
-      -   using app URL
+-   Demonstration of embedding full apps:
 
-        -   For more: <https://bookdown.org/yihui/rmarkdown/shiny-documents.html>
+    -   using app URL
 
--   interactive mapping with leaflet
+    For more: \<https://bookdown.org/yihui/rmarkdown/shiny-documents.html\>
+
+-   Interactive mapping with leaflet
 
     -   adding grouped and custom markers to a leaflet map
 
@@ -39,7 +39,7 @@ knitr::opts_chunk$set(echo = FALSE)
 ################################################################################
 ################################################################################
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#     Load req packages
+#     Load required packages
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ################################################################################
 ################################################################################
@@ -48,25 +48,16 @@ knitr::opts_chunk$set(echo = FALSE)
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #load packages
 suppressPackageStartupMessages({
-  #geospatial stuff
-  library(rgdal)
-  library(maptools)
-  library(rgeos)
-  library(sp)
-  library(sf)
+  #geospatial/ mapping
   library(leaflet)
   library(leaflet.providers)
+  library(rgdal)
+  library(sp)
   #data wrangling
   library(data.table)
   library(tidyverse) 
-  library(reshape2)
-  #library(packrat)
-  library(sqldf)
-  library(tidyr)
-  #text
   #visualisation
   library(plotly)
-  library(RColorBrewer)
   library(scales)
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   #     SHINY RELATED PACKAGES
@@ -81,9 +72,6 @@ suppressPackageStartupMessages({
   library(styler)
   library(shinyAce)
   library(shinyEffects)
-  library(htmlwidgets)
-  library(htmltools)
-  library(htmlTable)
   library(shinycssloaders)
 })
 
@@ -111,13 +99,12 @@ mycol <- colorRampPalette(c("#e30918","#ff8300", "#009736","#00a3ef",
 sa2_log <- readOGR(dsn=path.expand("./data/shape_files"), 
                    layer="Logan_SA2_2016")
 
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #     DSS Payments 2020 and ABS Total Population, A & TSI population, Language Spoken at at home 2016 data
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #log_data1 <- read.csv("Shiny/Code_Slides/data/Logan_SA2_DSS2020_Indig_TotalPop_Lang_at_home.csv")
 log_data1 <- read.csv("data/Logan_SA2_DSS2020_Indig_TotalPop_Lang_at_home.csv")
 #glimpse(log_data1)
-log_data1$X<-NULL
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #     Merge the df to the spatial data for the map
@@ -126,7 +113,9 @@ sa2_merged <- raster::merge(sa2_log, log_data1, by = "SA2_NAME16")
 
 ```
 
-## Inline apps ShinyApp() \| Leaflet
+### Inline apps ShinyApp() \| Leaflet
+
+-   Choose a basemap: <https://leaflet-extras.github.io/leaflet-providers/preview/>
 
 ```{r, echo = FALSE}
 
@@ -136,18 +125,20 @@ shinyApp(
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   
   ui = fluidPage(
-         fluidRow(column(width = 12,  
-                  pickerInput("stats_input", 
-                  label="Select a data point or statistic to colour the map:",
-                  multiple = FALSE,
-                  #selected = TRUE,
-                  choices = list("# of pop who identify as A & TSI" = "Total_ATSI",
-                                "Population" ="Total_pop",
-                                "# of Single Parenting Payments (DSS 2020)" = "Parenting_Payment_Single",
-                                "# of JobSeeker Payments (DSS 2020)" = "JobSeeker_Payment",
-                                "# of Disability Pensions (DSS 2020)" = "Disability_Support_.Pension",
-                                "Statistical Area 2 (SA2) 2016" = "SA2_NAME16"
-                           ), # end of choices list for stats drop down
+         fluidRow(
+                column(
+                    width = 12,  
+                    pickerInput("stats_input", 
+                    label="Select a data point or statistic to colour the map:",
+                    multiple = FALSE,
+                    #selected = TRUE,
+                    choices = list("# of pop who identify as A & TSI" = "Total_ATSI",
+                                  "Population" ="Total_pop",
+                                  "# of Single Parenting Payments (DSS 2020)" = "Parenting_Payment_Single",
+                                  "# of JobSeeker Payments (DSS 2020)" = "JobSeeker_Payment",
+                                  "# of Disability Pensions (DSS 2020)" = "Disability_Support_.Pension",
+                                  "Statistical Area 2 (SA2) 2016" = "SA2_NAME16"
+                             ), # end of choices list for stats drop down
                                                                     
                   options = list(`style` = "btn-danger"))#end pickerinput
                )#end column
@@ -159,10 +150,10 @@ shinyApp(
                  withSpinner(
                     leafletOutput("map",
                                   height = "420px", 
-                                  width="100%"))),#end column
+                                  width="100%")# end leaflet output
+                             )# end spinner
+                      ),#end column
                 )#end fluid row
-            #end fluidRow
-         
   ), # endFluidPage
   
   
@@ -177,20 +168,25 @@ shinyApp(
     #create the base map that will be displayed regardless of selected input
     output$map<-renderLeaflet({
         leaflet(sa2_merged) %>%
-            #addProviderTiles(leaflet::providers$Esri.WorldGrayCanvas) %>%
-            addProviderTiles(leaflet::providers$Esri.WorldImagery) %>%
-            # Centre the map in the middle of our co-ordinates
-            fitBounds(152.8, -27.7, 153.3, -27.6)
-        
+        #change the appearance of the base map
+        #for options see: https://leaflet-extras.github.io/leaflet-providers/preview/ 
+        #addProviderTiles(leaflet::providers$Esri.WorldGrayCanvas) %>%
+        addProviderTiles(leaflet::providers$Esri.WorldImagery) %>%
+        # Centre the map over Logan
+         fitBounds(152.8, -27.7, 153.3, -27.6)
     }) 
     
     
     
     #colour palettes - one numeric one for character or factor vars
-    observe({ #beginning of map
+    #beginning of map setting colour palette
+    observe({ 
+        # if Sa2 is selected colour each sa2 a different colour x30 SA2s
         if (input$stats_input == "SA2_NAME16") {
             pal <- colorFactor(mycol(30), 
                                domain= sa2_merged[[input$stats_input]])
+        #for all other selections colour based on high and low numeric values
+            # red high, green low
         } else {
             pal <- colorNumeric(c("#008B00","#C12525"), 
                                 domain = sa2_merged[[input$stats_input]], 
@@ -260,7 +256,7 @@ shinyApp(
 
 ```{r, echo = FALSE, warning=FALSE, message = FALSE,results="hide"}
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#     Food outlet data - these data were manually collected by a research assistance Nov 2020
+#Food outlet data - these data were manually collected by a research assistance Nov 2020
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #food_dat <- read.csv("Shiny/Code_Slides/data/Geocoded_Addresses_Food_Outlet_Logan_Jan_21_2021.csv")
 food_dat <- read.csv("data/Geocoded_Addresses_Food_Outlet_Logan_Jan_21_2021.csv")
@@ -269,7 +265,6 @@ food_dat <- read.csv("data/Geocoded_Addresses_Food_Outlet_Logan_Jan_21_2021.csv"
 
 #recode foot outlet types to consolidate categories
 food_dat_types_markers <- food_dat %>% 
-    dplyr::select(-X) %>% 
   #consolidate food outlet types as there are way too many
     mutate(Type_Food = case_when(
         Outlet_Type %in% c("Pickup", "Pickup ","Pickup_Delivery","Delivery", 
@@ -295,10 +290,11 @@ food_dat_types_markers <- food_dat %>%
     mutate(Type_Food = factor(Type_Food)) %>%
     glimpse()
 
+#check
 levels(food_dat_types_markers$Type_Food)
 ```
 
-## Adding markers to map \| Geocoded data from Google API
+### Adding markers to map \| Geocoded data from Google API
 
 -   custom markers with icons - awesomeIconList(makeAwesomeIcon())
 -   group markers based on categorical variable
@@ -358,12 +354,10 @@ shinyApp(
             fitBounds(152.8, -27.7, 153.3, -27.6)
         
     }) 
-    
-    
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    # Create custom Icons - different colour per Brand
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    # define groups for markers based on categorical variable
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Create custom Icons - different colour per Brand
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# define groups for markers based on categorical variable
     type_group <-levels(food_dat_types_markers$Type_Food)
     
     #what we want the markers to look like when applied to the map
@@ -385,7 +379,7 @@ shinyApp(
         Sports_Club_Park = makeAwesomeIcon(icon='ok-sign', library='glyphicon', markerColor = 'lightgreen'),
         Supplements_Store = makeAwesomeIcon(icon='map-marker', library='glyphicon', markerColor = 'darkgreen'),
         Venue_Catering = makeAwesomeIcon(icon='ok-sign', library='glyphicon', markerColor = 'darkpurple')
-        )
+        )#end awesomeIconList
     
     
     
@@ -439,11 +433,11 @@ shinyApp(
                              options = layersControlOptions(collapsed = FALSE), 
                              position = "bottomright")
         
-
-    
     })# end of map shape colour and labeling  and legend observe event
     
-  },
+  }, # end of the server logic
+
+
   # set height of widget recommended not over 500 px for slides
   options = list(height = 500, width = "100%")
 )# end shinyapp widget 
@@ -451,7 +445,7 @@ shinyApp(
 
 ```
 
-## Clustering markers \| reduce clutter
+### Clustering markers \| reduce clutter
 
 ```{r, echo = FALSE}
 
@@ -598,7 +592,7 @@ shinyApp(
 
 ```
 
-### Leaflet marker resources:
+#### Leaflet marker resources:
 
 -   [\<https://github.com/bhaskarvk/leaflet/blob/master/inst/examples/awesomeMarkers.R\>](https://github.com/bhaskarvk/leaflet/blob/master/inst/examples/awesomeMarkers.R){.uri} 
 
@@ -610,14 +604,13 @@ shinyApp(
 
 -   [\<https://rstudio.github.io/leaflet/markers.html\>](https://rstudio.github.io/leaflet/markers.html){.uri}  
 
-### Advanced clustering - custom icons and clusters:
+#### Advanced clustering - custom icons and clusters:
 
--   [\<https://stackoverflow.com/questions/47507854/coloring-clusters-by-markers-inside\>](https://stackoverflow.com/questions/47507854/coloring-clusters-by-markers-inside){.uri}
+[\<https://stackoverflow.com/questions/47507854/coloring-clusters-by-markers-inside\>](https://stackoverflow.com/questions/47507854/coloring-clusters-by-markers-inside){.uri}
 
-## Embedding a full shiny app
+### Embedding a full shiny app
 
 ```{r}
 knitr::include_app("https://regionalinnovationdatalab.shinyapps.io/Logan_Food_Mapping/", 
   height = "700px")
 ```
-
