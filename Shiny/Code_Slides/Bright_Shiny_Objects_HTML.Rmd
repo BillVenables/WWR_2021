@@ -34,6 +34,14 @@ Demonstrate how Shiny apps, widgets and components can be integrated with .Rmd d
 
     -   cluster markers
 
+### R Shiny & R Markdown \| Getting started
+
+-   file path is relative to where your .rmd document is saved - runs like a shiny app
+
+-   good practice for file structure:
+
+    -   data/ www/ output/ etc...
+
 ```{r, echo = FALSE, warning=FALSE, message = FALSE,results="hide"}
 
 ################################################################################
@@ -48,6 +56,9 @@ Demonstrate how Shiny apps, widgets and components can be integrated with .Rmd d
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #load packages
 suppressPackageStartupMessages({
+  #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  #     Data prep, gis and  data vis packages
+  #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   #geospatial/ mapping
   library(leaflet)
   library(leaflet.providers)
@@ -73,6 +84,7 @@ suppressPackageStartupMessages({
   library(shinyAce)
   library(shinyEffects)
   library(shinycssloaders)
+  library(rsconnect)
 })
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
