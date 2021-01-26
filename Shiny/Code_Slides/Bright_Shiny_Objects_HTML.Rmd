@@ -80,38 +80,26 @@ Demonstrate how Shiny apps, widgets and components can be integrated with .Rmd d
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #load packages
 suppressPackageStartupMessages({
-<<<<<<< HEAD:Shiny/Code_Slides/Bright_Shiny_Objects_HTML.Rmd
 
-   #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  #    DATA and MAPPING PACKAGES
-  #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  #geospatial/ mapping
-  library(rgdal)
-=======
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   #     Data prep, gis and  data vis packages
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   #geospatial/ mapping
->>>>>>> 5c5a5de2c7918247536d803f7645de0fb6ea9b27:Shiny/Code_Slides/Bright_Shiny_Objects_Preso.Rmd
+  
+  library(rgdal)
   library(leaflet)
   library(leaflet.providers)
   library(rgdal)
   library(sp)
-<<<<<<< HEAD:Shiny/Code_Slides/Bright_Shiny_Objects_HTML.Rmd
   
   #data wrangling
   library(data.table)
   library(tidyverse) 
 
   #visualisation
-=======
-  #data wrangling
-  library(data.table)
-  library(tidyverse) 
-  #visualisation
   library(plotly)
->>>>>>> 5c5a5de2c7918247536d803f7645de0fb6ea9b27:Shiny/Code_Slides/Bright_Shiny_Objects_Preso.Rmd
   library(scales)
+  
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   #     SHINY RELATED PACKAGES
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -125,10 +113,7 @@ suppressPackageStartupMessages({
   library(shinyEffects)
   library(shinycssloaders)
   library(rsconnect)
-<<<<<<< HEAD:Shiny/Code_Slides/Bright_Shiny_Objects_HTML.Rmd
-  
-=======
->>>>>>> 5c5a5de2c7918247536d803f7645de0fb6ea9b27:Shiny/Code_Slides/Bright_Shiny_Objects_Preso.Rmd
+
 })
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
