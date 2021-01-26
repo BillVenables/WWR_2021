@@ -1,0 +1,632 @@
+---
+title: "Bright R Shiny Objects"
+author: "Bill Venables, Data61, CSIRO & Rhetta Chappell, RIDL, Griffith University"
+date: "February 2021"
+output:
+ ioslides_presentation: 
+ css: temp.css
+subtitle: "UQ Advanced R 2021"
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+```
+
+## Purpose:
+
+Demonstrate how Shiny apps, widgets and components can be integrated with .Rmd documents ( .html, ioslides)
+
+## Topics covered:
+
+-   Demonstration of inline apps: shinyApp() function
+
+-   Demonstration of embedding full apps: using app URL
+
+    For more: \<[[https://bookdown.org/yihui/rmarkdown/shiny-documents.html\\\\](https://bookdown.org/yihui/rmarkdown/shiny-documents.html\\){.uri}]([https://bookdown.org/yihui/rmarkdown/shiny-documents.html\\](https://bookdown.org/yihui/rmarkdown/shiny-documents.html\){.uri}){.uri}\>
+
+-   Interactive mapping with leaflet
+
+    -   adding grouped and custom markers
+
+    -   cluster markers
+
+## R Shiny & R Markdown \| Getting started
+
+-   file path is relative to where your .rmd document is saved - runs like a shiny app
+
+-   good practice for file structure:
+
+    -   data/ www/ output/ etc...
+
+-   leaflet: choose a basemap: [<https://leaflet-extras.github.io/leaflet-providers/preview/>](https://leaflet-extras.github.io/leaflet-providers/preview/){.uri}
+
+```{r, echo = FALSE, warning=FALSE, message = FALSE,results="hide"}
+
+################################################################################
+################################################################################
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#     Load required packages
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+################################################################################
+################################################################################
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#    DATA RELATED PACKAGES
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#load packages
+suppressPackageStartupMessages({
+  #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  #     Data prep, gis and  data vis packages
+  #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  #geospatial/ mapping
+  library(leaflet)
+  library(leaflet.providers)
+  library(rgdal)
+  library(sp)
+  #data wrangling
+  library(data.table)
+  library(tidyverse) 
+  #visualisation
+  library(plotly)
+  library(scales)
+  #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  #     SHINY RELATED PACKAGES
+  #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  library(shiny)
+  library(shinythemes)
+  library(shinydashboard)
+  library(shinyWidgets)
+  library(shinyalert)
+  library(shinydashboardPlus)
+  library(shinyjqui)
+  library(styler)
+  library(shinyAce)
+  library(shinyEffects)
+  library(shinycssloaders)
+  library(rsconnect)
+})
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#     Aesthetic stuff
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+mycol <- colorRampPalette(c("#e30918","#ff8300", "#009736","#00a3ef",
+                            "#3b28cc", "#aa9aba")) # IEE & RIDL colours
+
+
+################################################################################
+################################################################################
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#     Read in the data
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+################################################################################
+################################################################################
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#     Spatial Data - 2016 ABS SA2 polygons (shp files) - subset to Logan LGA
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# sa2_log <- readOGR(dsn=path.expand("./Shiny/Code_Slides/data/shape_files"), 
+#                    layer="Logan_SA2_2016")
+
+sa2_log <- readOGR(dsn=path.expand("./data/shape_files"), 
+                   layer="Logan_SA2_2016")
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#     DSS Payments 2020 and ABS Total Population, A & TSI population, Language Spoken at at home 2016 data
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#log_data1 <- read.csv("Shiny/Code_Slides/data/Logan_SA2_DSS2020_Indig_TotalPop_Lang_at_home.csv")
+log_data1 <- read.csv("data/Logan_SA2_DSS2020_Indig_TotalPop_Lang_at_home.csv")
+#glimpse(log_data1)
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#     Merge the df to the spatial data for the map
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+sa2_merged <- raster::merge(sa2_log, log_data1, by = "SA2_NAME16")
+
+```
+
+## Inline apps: Leaflet
+
+```{r, echo = FALSE}
+
+shinyApp(
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#     UI - what people see and interact with
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  
+  ui = fluidPage(
+         fluidRow(
+                column(
+                    width = 12,  
+                    pickerInput("stats_input", 
+                    label="Select a data point or statistic to colour the map:",
+                    multiple = FALSE,
+                    #selected = TRUE,
+                    choices = list("# of pop who identify as A & TSI" = "Total_ATSI",
+                                  "Population" ="Total_pop",
+                                  "# of Single Parenting Payments (DSS 2020)" = "Parenting_Payment_Single",
+                                  "# of JobSeeker Payments (DSS 2020)" = "JobSeeker_Payment",
+                                  "# of Disability Pensions (DSS 2020)" = "Disability_Support_.Pension",
+                                  "Statistical Area 2 (SA2) 2016" = "SA2_NAME16"
+                             ), # end of choices list for stats drop down
+                                                                    
+                  options = list(`style` = "btn-danger"))#end pickerinput
+               )#end column
+           ), # end fluidrow
+         
+         fluidRow(
+                column(12,
+               # leaflet map output
+                 withSpinner(
+                    leafletOutput("map",
+                                  height = "420px", 
+                                  width="100%")# end leaflet output
+                             )# end spinner
+                      ),#end column
+                )#end fluid row
+  ), # endFluidPage
+  
+  
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#     SERVER - back end logic
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  server = function(input, output, session) {
+    
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                                   #MAP OUTPUT 
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    #create the base map that will be displayed regardless of selected input
+    output$map<-renderLeaflet({
+        leaflet(sa2_merged) %>%
+        #change the appearance of the base map
+        #for options see: https://leaflet-extras.github.io/leaflet-providers/preview/ 
+        #addProviderTiles(leaflet::providers$Esri.WorldGrayCanvas) %>%
+        addProviderTiles(leaflet::providers$Esri.WorldImagery) %>%
+        # Centre the map over Logan
+         fitBounds(152.8, -27.7, 153.3, -27.6)
+    }) 
+    
+    
+    
+    #colour palettes - one numeric one for character or factor vars
+    #beginning of map setting colour palette
+    observe({ 
+        # if Sa2 is selected colour each sa2 a different colour x30 SA2s
+        if (input$stats_input == "SA2_NAME16") {
+            pal <- colorFactor(mycol(30), 
+                               domain= sa2_merged[[input$stats_input]])
+        #for all other selections colour based on high and low numeric values
+            # red high, green low
+        } else {
+            pal <- colorNumeric(c("#008B00","#C12525"), 
+                                domain = sa2_merged[[input$stats_input]], 
+                                reverse = FALSE)
+        }
+        
+        
+        
+        #labels for polygons - hover or click
+        labels <- sprintf(
+            "<strong>%s</strong><br/>", 
+            sa2_merged$SA2_NAME16) %>% lapply(htmltools::HTML)
+        
+        #creating a proxy map which reacts to user input
+        #displays the various stats from the stats drop down 
+        leafletProxy("map", data = sa2_merged) %>%
+            clearShapes() %>%
+          #add the SA2 polygons, colour and label them
+            addPolygons(
+                layerId = sa2_merged$SA2_NAME16,
+                #colour map polygons based on user input
+                #colour pal created above
+                fillColor = ~pal(sa2_merged[[input$stats_input]]), 
+                #how strong in the fill
+                fillOpacity = 0.9,
+                #polygon outline weight
+                weight = 0.6,
+                opacity = 1,
+                #outline of polygons
+                color = "#FFFFFF",
+                dashArray = "2",
+                #labels as defined above
+                label = labels
+            )
+        
+        
+    # creating more human readable legend title based on input
+    varname<-switch(input$stats_input,
+                     "Total_ATSI" = "# of pop who identify as A & TSI",
+                     "Total_pop" = "Population",
+                     "Parenting_Payment_Single" = "# of Single Parenting Payments (DSS 2020)",
+                     "JobSeeker_Payment" = "# of JobSeeker Payments (DSS 2020)",
+                     "Disability_Support_.Pension" = "# of Disability Pensions (DSS 2020)",
+                     "SA2_NAME16" = "Statistical Area 2 (SA2) 2016")
+
+
+    # the proxy map which will display the legend set above
+    leafletProxy("map", data = sa2_merged) %>% 
+      clearControls() %>%
+        addLegend(pal = pal, 
+                  opacity = 0.9, 
+                  title = varname,
+                  values = ~sa2_merged[[input$stats_input]],
+                  labels = c(min(input$stats_input), 
+                             max(input$stats_input)),
+                  position = "topright")
+    
+    })# end of map shape colour and labeling  and legend observe event
+    
+  },
+  # set height of widget recommended not over 500 px 
+  options = list(height = 500, width = "100%")
+)# end shinyapp widget 
+
+
+```
+
+```{r, echo = FALSE, warning=FALSE, message = FALSE,results="hide"}
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#Food outlet data - these data were manually collected by a research assistance Nov 2020
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#food_dat <- read.csv("Shiny/Code_Slides/data/Geocoded_Addresses_Food_Outlet_Logan_Jan_21_2021.csv")
+food_dat <- read.csv("data/Geocoded_Addresses_Food_Outlet_Logan_Jan_21_2021.csv")
+
+#unique(food_dat$Outlet_Type)
+
+#recode foot outlet types to consolidate categories
+food_dat_types_markers <- food_dat %>% 
+  #consolidate food outlet types as there are way too many
+    mutate(Type_Food = case_when(
+        Outlet_Type %in% c("Pickup", "Pickup ","Pickup_Delivery","Delivery", 
+                           "Restaurant_Takeaway", "Takeaway" ) ~ "Pickup_Delivery",
+        Outlet_Type %in% c("Bakery","Bakery " ) ~ "Bakery",
+        Outlet_Type %in% c("Convenience_Petrol","Convenience Store", 
+                           "Local Market ","Local Market" ) ~ "Local_Convienience",
+        Outlet_Type %in% c( "Cafe", "Restaurant", "Restaurant ",
+                            "Dessert"  ) ~ "Restaurant_Cafe",
+        Outlet_Type %in% c( "Distillery", "Brewery", 
+                            "Restaurant_Pub" ) ~ "Pub_Brewery_Distillery",
+        Outlet_Type %in% c( "Supermarket ", "Grocery Store",
+                            "Butcher" ) ~ "Supermarket",
+        Outlet_Type %in% c(  "Water Park ", "Sports Club") ~ "Sports_Club_Park",
+        Outlet_Type %in% c("Venue", "Catering" ) ~ "Venue_Catering",
+        TRUE ~ as.character(Outlet_Type)
+    )) %>% 
+  #format names and markers don't like spaces in names
+    mutate(Type_Food = gsub(" ", "_", Type_Food),
+           Type_Food = as.factor(Type_Food)) %>% 
+     #this is a nonsense category of one so get rid of it
+    filter(Type_Food != "What_is_is") %>% 
+    mutate(Type_Food = factor(Type_Food)) %>%
+    glimpse()
+
+#check
+levels(food_dat_types_markers$Type_Food)
+```
+
+## Adding markers to Leaflet map 
+
+-   Geocoded data from Google API
+-   custom markers with icons - awesomeIconList(makeAwesomeIcon())
+-   group markers based on categorical variable
+
+## Inline apps: Leaflet with markers 
+
+```{r, echo = FALSE}
+
+shinyApp(
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#     UI - what people see and interact with
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  
+  ui = fluidPage(
+         fluidRow(
+           column(
+             width = 12,  
+                  pickerInput("stats_input", 
+                  label="Select a data point or statistic to colour the map:",
+                  multiple = FALSE,
+                  #selected = TRUE,
+                  choices = list("# of pop who identify as A & TSI" = "Total_ATSI",
+                                "Population" ="Total_pop",
+                                "# of Single Parenting Payments (DSS 2020)" = "Parenting_Payment_Single",
+                                "# of JobSeeker Payments (DSS 2020)" = "JobSeeker_Payment",
+                                "# of Disability Pensions (DSS 2020)" = "Disability_Support_.Pension",
+                                "Statistical Area 2 (SA2) 2016" = "SA2_NAME16"
+                           ), # end of choices list for stats drop down
+                                                                    
+                  options = list(`style` = "btn-danger")# end choices
+                  )#end pickerinput
+               )#end column
+           ), # end fluidrow
+         
+         fluidRow(
+                column(12,
+               # leaflet map output
+                 withSpinner(
+                    leafletOutput("map",height = "420px", width="100%")#end leaflet
+                    )#end spinner
+                   ),#end column
+                )#end fluid row
+  ), # endFluidPage
+  
+  
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#     SERVER - back end logic
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  server = function(input, output, session) {
+    
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                                   #MAP OUTPUT 
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    #create the base map that will be displayed regardless of selected input
+    output$map<-renderLeaflet({
+        leaflet(sa2_merged) %>%
+            #addProviderTiles(leaflet::providers$Esri.WorldGrayCanvas) %>%
+            #addProviderTiles(leaflet::providers$Esri.WorldImagery) %>%
+            addProviderTiles(leaflet::providers$Esri.WorldStreetMap ) %>%
+            #we only want the markers on the map if the user selects them
+            hideGroup(type_group) %>%
+            # Centre the map in the middle of our co-ordinates
+            fitBounds(152.8, -27.7, 153.3, -27.6)
+        
+    }) 
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Create custom Icons - different colour per Brand
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# define groups for markers based on categorical variable
+    type_group <-levels(food_dat_types_markers$Type_Food)
+    
+    #what we want the markers to look like when applied to the map
+    Food_Icons <- awesomeIconList(
+        Hypermarket = makeAwesomeIcon(icon='shopping-cart', library='glyphicon', markerColor = 'black'),
+        Supermarket = makeAwesomeIcon(icon='shopping-cart', library='glyphicon', markerColor = 'lightgray'),
+        Pickup_Delivery = makeAwesomeIcon(icon='phone', library='glyphicon', markerColor = 'darkblue'),
+        Restaurant_Cafe = makeAwesomeIcon(icon='cutlery', library='glyphicon', markerColor = 'cadetblue'),
+        Fast_Food_restaurant = makeAwesomeIcon(icon='cutlery', library='glyphicon', markerColor = 'blue'),
+        Local_Convienience = makeAwesomeIcon(icon='shopping-cart', library='glyphicon', markerColor = 'gray'),
+        Food_relief_service  = makeAwesomeIcon(icon='alert', library='glyphicon', markerColor = 'red'),
+        Pub_Brewery_Distillery = makeAwesomeIcon(icon='glass', library='glyphicon', markerColor = 'pink'),
+        Bakery = makeAwesomeIcon(icon='grain', library='glyphicon', markerColor = 'beige'),
+        Farm = makeAwesomeIcon(icon='apple', library='glyphicon', markerColor = 'green'),
+        Food_Manufacturer = makeAwesomeIcon(icon='wrench', library='glyphicon', markerColor = 'orange'),
+        Food_Truck = makeAwesomeIcon(icon='bullhorn', library='glyphicon', markerColor = 'purple'),
+        Food_Supplier = makeAwesomeIcon(icon='star', library='glyphicon', markerColor = 'lightred'),
+        Staff_Exclusive = makeAwesomeIcon(icon='briefcase', library='glyphicon', markerColor = 'lightblue'),
+        Sports_Club_Park = makeAwesomeIcon(icon='ok-sign', library='glyphicon', markerColor = 'lightgreen'),
+        Supplements_Store = makeAwesomeIcon(icon='map-marker', library='glyphicon', markerColor = 'darkgreen'),
+        Venue_Catering = makeAwesomeIcon(icon='ok-sign', library='glyphicon', markerColor = 'darkpurple')
+        )#end awesomeIconList
+    
+    
+    
+    #colour palettes - one numeric one for character or factor vars
+    #beginning of map
+    observe({ 
+        if (input$stats_input == "SA2_NAME16") {
+            pal <- colorFactor(mycol(30), #mycol is a colourRamp pal we set at beginning
+                               domain= sa2_merged[[input$stats_input]])
+        } else {
+            pal <- colorNumeric(c("#008B00","#C12525"), 
+                                domain = sa2_merged[[input$stats_input]], 
+                                reverse = FALSE)
+        }
+        
+        
+        
+        #labels for polygons - hover or click
+        labels <- sprintf(
+            "<strong>%s</strong><br/>", 
+            sa2_merged$SA2_NAME16) %>% lapply(htmltools::HTML)
+        
+        #creating a proxy map which reacts to user input
+        #displays the various stats from the stats drop down 
+        leafletProxy("map", data = sa2_merged) %>%
+            clearShapes() %>%
+          #add the SA2 polygons, colour and label them
+            addPolygons(
+                layerId = sa2_merged$SA2_NAME16,
+                #colour map polygons based on user input
+                #colour pal created above
+                fillColor = ~pal(sa2_merged[[input$stats_input]]), 
+                #how strong in the fill
+                fillOpacity = 0.9,
+                #polygon outline weight
+                weight = 0.6,
+                opacity = 1,
+                #outline of polygons
+                color = "#FFFFFF",
+                dashArray = "2",
+                #labels as defined above
+                label = labels)%>% 
+            # ADD IN THE MARKERS WE DEFINED ABOVE 
+            addAwesomeMarkers(data = food_dat_types_markers,
+                          lng = ~lon, lat = ~lat,
+                          #control which markers go together when selected
+                          group = ~type_group[Type_Food],
+                          #what the markers will look like as we set above
+                          icon = ~Food_Icons[Type_Food]) %>% 
+            #add layer controls - this is how we control the grouping of markers
+            addLayersControl(overlayGroups = type_group,
+                             options = layersControlOptions(collapsed = FALSE), 
+                             position = "bottomright")
+        
+    })# end of map shape colour and labeling  and legend observe event
+    
+  }, # end of the server logic
+
+
+  # set height of widget recommended not over 500 px for slides
+  options = list(height = 500, width = "100%")
+)# end shinyapp widget 
+
+
+```
+
+## Clustering markers \| reduces clutter
+
+```{r, echo = FALSE}
+
+shinyApp(
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#     UI - what people see and interact with
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  
+  ui = fluidPage(
+         fluidRow(column(width = 12,  
+                  pickerInput("stats_input", 
+                  label="Select a data point or statistic to colour the map:",
+                  multiple = FALSE,
+                  #selected = TRUE,
+                  choices = list("# of pop who identify as A & TSI" = "Total_ATSI",
+                                "Population" ="Total_pop",
+                                "# of Single Parenting Payments (DSS 2020)" = "Parenting_Payment_Single",
+                                "# of JobSeeker Payments (DSS 2020)" = "JobSeeker_Payment",
+                                "# of Disability Pensions (DSS 2020)" = "Disability_Support_.Pension",
+                                "Statistical Area 2 (SA2) 2016" = "SA2_NAME16"
+                           ), # end of choices list for stats drop down
+                                                                    
+                  options = list(`style` = "btn-danger"))#end pickerinput
+               )#end column
+           ), # end fluidrow
+         
+         fluidRow(
+                column(12,
+               # leaflet map output
+                 withSpinner(
+                    leafletOutput("map",height = "420px", width="100%"))),#end column
+                )#end fluid row
+  ), # endFluidPage
+  
+  
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#     SERVER - back end logic
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  server = function(input, output, session) {
+    
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                                   #MAP OUTPUT 
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    #create the base map that will be displayed regardless of selected input
+    output$map<-renderLeaflet({
+        leaflet(sa2_merged) %>%
+            addProviderTiles(leaflet::providers$Esri.WorldGrayCanvas) %>%
+            #addProviderTiles(leaflet::providers$Esri.WorldImagery) %>%
+            #we only want the markers on the map if the user selects them
+            hideGroup(type_group) %>%
+            # Centre the map in the middle of our co-ordinates
+            fitBounds(152.8, -27.7, 153.3, -27.6)
+        
+    }) 
+    
+    
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    # Create custom Icons - different colour per Brand
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    # define groups for markers based on categorical variable
+    type_group <-levels(food_dat_types_markers$Type_Food)
+    
+    #what we want the markers to look like when applied to the map
+    Food_Icons <- awesomeIconList(
+        Hypermarket = makeAwesomeIcon(icon='shopping-cart', library='glyphicon', markerColor = 'black'),
+        Supermarket = makeAwesomeIcon(icon='shopping-cart', library='glyphicon', markerColor = 'lightgray'),
+        Pickup_Delivery = makeAwesomeIcon(icon='phone', library='glyphicon', markerColor = 'darkblue'),
+        Restaurant_Cafe = makeAwesomeIcon(icon='cutlery', library='glyphicon', markerColor = 'cadetblue'),
+        Fast_Food_restaurant = makeAwesomeIcon(icon='cutlery', library='glyphicon', markerColor = 'blue'),
+        Local_Convienience = makeAwesomeIcon(icon='shopping-cart', library='glyphicon', markerColor = 'gray'),
+        Food_relief_service  = makeAwesomeIcon(icon='alert', library='glyphicon', markerColor = 'red'),
+        Pub_Brewery_Distillery = makeAwesomeIcon(icon='glass', library='glyphicon', markerColor = 'pink'),
+        Bakery = makeAwesomeIcon(icon='grain', library='glyphicon', markerColor = 'beige'),
+        Farm = makeAwesomeIcon(icon='apple', library='glyphicon', markerColor = 'green'),
+        Food_Manufacturer = makeAwesomeIcon(icon='wrench', library='glyphicon', markerColor = 'orange'),
+        Food_Truck = makeAwesomeIcon(icon='bullhorn', library='glyphicon', markerColor = 'purple'),
+        Food_Supplier = makeAwesomeIcon(icon='star', library='glyphicon', markerColor = 'lightred'),
+        Staff_Exclusive = makeAwesomeIcon(icon='briefcase', library='glyphicon', markerColor = 'lightblue'),
+        Sports_Club_Park = makeAwesomeIcon(icon='ok-sign', library='glyphicon', markerColor = 'lightgreen'),
+        Supplements_Store = makeAwesomeIcon(icon='map-marker', library='glyphicon', markerColor = 'darkgreen'),
+        Venue_Catering = makeAwesomeIcon(icon='ok-sign', library='glyphicon', markerColor = 'darkpurple')
+        )
+    
+    
+    
+    #colour palettes - one numeric one for character or factor vars
+    observe({ #beginning of map
+        if (input$stats_input == "SA2_NAME16") {
+            pal <- colorFactor(mycol(30), 
+                               domain= sa2_merged[[input$stats_input]])
+        } else {
+            pal <- colorNumeric(c("#008B00","#C12525"), 
+                                domain = sa2_merged[[input$stats_input]], 
+                                reverse = FALSE)
+        }
+        
+        
+        
+        #labels for polygons - hover or click
+        labels <- sprintf(
+            "<strong>%s</strong><br/>", 
+            sa2_merged$SA2_NAME16) %>% lapply(htmltools::HTML)
+        
+        #creating a proxy map which reacts to user input
+        #displays the various stats from the stats drop down 
+        leafletProxy("map", data = sa2_merged) %>%
+            clearShapes() %>%
+          #add the SA2 polygons, colour and label them
+            addPolygons(
+                layerId = sa2_merged$SA2_NAME16,
+                #colour map polygons based on user input
+                #colour pal created above
+                fillColor = ~pal(sa2_merged[[input$stats_input]]), 
+                #how strong in the fill
+                fillOpacity = 0.9,
+                #polygon outline weight
+                weight = 0.6,
+                opacity = 1,
+                #outline of polygons
+                color = "#FFFFFF",
+                dashArray = "2",
+                #labels as defined above
+                label = labels)%>% 
+            # ADD IN THE MARKERS WE DEFINED ABOVE 
+            addAwesomeMarkers(data = food_dat_types_markers,
+                          lng = ~lon, lat = ~lat,
+                          #control which markers go together when selected
+                          group = ~type_group[Type_Food],
+                          #what the markers will look like as we set above
+                          icon = ~Food_Icons[Type_Food],
+                          clusterOptions = markerClusterOptions())
+        
+
+    
+    })# end of map shape colour and labeling  and legend observe event
+    
+  },
+  # set height of widget recommended not over 500 px for slides
+  options = list(height = 500, width = "100%")
+)# end shinyapp widget 
+
+
+```
+
+## Leaflet marker resources:
+
+-   [\<https://github.com/bhaskarvk/leaflet/blob/master/inst/examples/awesomeMarkers.R\>](https://github.com/bhaskarvk/leaflet/blob/master/inst/examples/awesomeMarkers.R){.uri} 
+
+-   [\<https://github.com/rstudio/leaflet/issues/691\>](https://github.com/rstudio/leaflet/issues/691){.uri}  
+
+-   [\<https://getbootstrap.com/docs/3.3/components/\>](https://getbootstrap.com/docs/3.3/components/){.uri}  
+
+-   [\<https://rdrr.io/cran/leaflet/man/makeAwesomeIcon.html\>](https://rdrr.io/cran/leaflet/man/makeAwesomeIcon.html){.uri}  
+
+-   [\<https://rstudio.github.io/leaflet/markers.html\>](https://rstudio.github.io/leaflet/markers.html){.uri}  
+
+#### Advanced clustering - custom icons and clusters:
+
+[\<https://stackoverflow.com/questions/47507854/coloring-clusters-by-markers-inside\>](https://stackoverflow.com/questions/47507854/coloring-clusters-by-markers-inside){.uri}
+
+## Embedding a full shiny app
+
+```{r}
+knitr::include_app("https://regionalinnovationdatalab.shinyapps.io/Logan_Food_Mapping/", 
+  height = "500px")
+```

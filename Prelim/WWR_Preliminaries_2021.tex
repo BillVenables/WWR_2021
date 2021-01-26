@@ -1,0 +1,244 @@
+\documentclass[12pt]{article}
+
+\usepackage{fullpage}
+\usepackage{parskip}
+\usepackage[utf8]{inputenc}
+\usepackage{fouriernc}
+\usepackage{tabularx}
+\usepackage{RlogoNew}
+\usepackage{Rcolors}
+\usepackage{hyperref}
+\hypersetup{
+    colorlinks=true,
+    linkcolor=cyan,
+    filecolor=magenta,      
+    urlcolor=blue,
+}
+
+\title{Working with \Rlogo:\\
+  A University of Queensland Advanced Workshop\\[10pt]
+Preliminaries for Participants}
+
+\author{Bill Venables, Data61, CSIRO\\
+Rhetta Chappell, Griffiths University}
+\date{2021-02-02 -- 2021-02-05\\[10pt]
+  Room 216, Sir Llew Edwards Building\\[5pt]
+  The University of Queensland}
+
+
+\begin{document}
+\maketitle
+
+\section{Introduction and welcome}
+\label{sec:welcome}
+
+This four-day workshop is intended for current \R users who wish to
+deepen their understanding of the programming environment and of the
+data analysis and visualisation tools it provides.  Some experience
+with \R is assumed, but some experience with data analysis and
+programming in professional practice is probably just as important.
+
+The workshop will involve formal presentations, interspersed with
+periods of free time for further investigation of the examples
+presented, and any related questions that arise.  Participants are
+\emph{encouraged to bring along their own data sets} and data analysis
+problems, and to discuss them with the presenters during the free
+periods.  The best way to learn \R is to \emph{use} \R on real
+problems from your own professional disciplines.
+
+
+\section{Materials and preparation}
+\label{sec:prep}
+
+\begin{description}
+\item[Laptop] To take part in the sessions, participants will need to
+  bring along their own laptop with \R installed beforehand.
+  
+\item[\R version] The version of \R installed should be the latest,
+  \emph{\R~4.0.3}.
+
+  Versions of \R older than \R~3.5.0 will not be able to
+  handle some of the course data sets.
+
+  [Note that going from \R~3.*.* (or older!) to \R~4.0.* is a major
+  upgrade requiring all your currently installed packages to be
+  re-installed. This may take some time.]
+
+\item[CRAN Packages] Participants should have the required
+  capabilities to \emph{install and maintain} \R packages on the
+  laptop they will be using for the workshop.
+
+  Participants are encouraged to \emph{update their packages} to the
+  latest versions available.
+
+  The workshop will use a number of additional \R packages, and
+  an \R script, namely \verb|WWR_packages_2021.R|, will be provided,
+  \emph{by email}, to install these beforehand. The simplest way to
+  to use the script is, from within an \R console, issue the command
+
+  \verb|source("WWR_packages_2021.R")|
+
+  making sure the script file itself is in the \R working directory.
+  This may be done immediately once the script is available.
+
+  Note that in addition to any required CRAN packages, this script
+  will also install several other packages from a \emph{GitHub} repo,
+  namely \url{https://github.com/BillVenables}.  The software to do
+  this, if needed, will be installed automatically.
+
+  
+\item[RStudio] The \RStudio API (`application-programmer interface')
+  to \R will be assumed and used extensively throughout the
+  workshop.\footnote{Other interfaces to \R could be used if
+    participants have a particular preference, but some aspects of the
+    work will then not be easily available.  We strongly recommend
+    participants have \RStudio installed, whether they use it
+    routinely or not.}  As of now, the latest version is
+  \RStudio~1.4.1103.  We recommend you update to this release, (or
+  later).  A link to the download site is given
+  \href{https://rstudio.com/products/rstudio/download/}{here}. The
+  free desktop version is adequate.
+
+  To update an existing installation, a good way to begin is to start
+  up \RStudio and go to the menu:
+  \begin{center}
+    \texttt{Help} $\longrightarrow$ \texttt{Check for updates}
+  \end{center}
+  and follow the advice.
+  
+  The main materials for the course will be delivered as a complete
+  \RStudio~\emph{Project} as a \verb|.zip| file.  This can be
+  downloaded and expanded to provide a directory (or folder) that will
+  form the \emph{working directory} for the workshop.  This directory
+  will have several sub-directories with the file materials logically
+  classified.  When expanded, the folder name will be \verb|WWR_2021|.
+
+  Users may locate this folder anywhere on the file system of their
+  machines, or even on an attached memory
+  device.\footnote{Participants unfamiliar with, or preferring not to
+    use \RStudio, may use this project directory in the same way they
+    would any \R working directory.}
+\item[Other tools used with \R] To take part fully in the workshop,
+  some ancillary programming tools will be needed.  These are mainly
+  needed to deal with using fast compiled code in computations and
+  package construction. These come in several forms, depending on the
+  operating system on your machine:
+  \begin{description}
+  \item[\Windows] With \R~4.0.0 and later the compiler tools are
+    available as a \Windows~\verb|.exe| file, which can be downloaded
+    from \href{https://cloud.r-project.org/bin/windows/Rtools/}{this
+      link}.  In addition to running the \verb|.exe| file, some
+    additional steps may be required, as outlined on the download
+    page.
+  \item[\MacOS] On this system \R is built using
+    \verb|Apache Xcode 10.1| and \verb|GNU Fortran 8.2|, which are
+    required for compiled code within \R itself.  See
+    \href{https://cloud.r-project.org/bin/macosx/tools/}{this link}
+    for further details. (Disclaimer: Neither presenter has any
+    experience with \MacOS!)
+  \end{description}
+\item[Version control] Though not a fundamental part of the workshop,
+  participants will be encouraged to learn, and to use, version
+  control.  For this purpose the currently favoured tool is
+  \git\footnote{The name is allegedly derived from the word
+    `\emph{git}', which means `\emph{stupid person}' in British slang.
+    An alternative derivation is an an acronym for `\emph{Global
+      Information Tracking}'.  Take you pick.}  This is free and
+  open-source software, available for all common operating systems,
+  and freely located on the web.  Installation is simple.
+
+  Eventually you may wish to get yourself a free \github (or \gitlab)
+  account to facilitate collaborative working, or to allow access on
+  several machines.  Details are left for the reader to investigate.
+  
+\item[\TeX{} and \LaTeX] The \TeX{} document preparation system, which
+  includes \LaTeX{} and many other tools, is a major system and
+  although it is free and available for all operating systems,
+  installation can be a major undertaking.  It also comes in several
+  different distributions, which can also be a complication.
+
+  The system is mainly needed in \R for rendering documents into
+  \verb|pdf| (rather than \verb|html| or \verb|Word|, for example) and
+  for building some optional parts of \R packages.  Users for which
+  this is important will clearly need to have it installed, but for
+  this workshop it is optional.  To some extent the \R package
+  \verb|tinytex| provides enough functionality for basic applications,
+  if users unfamiliar with the system wish to investigate.
+  
+
+\end{description}
+
+\section{Synopsis}
+\label{sec:synopsis}
+
+The recommended set-up process is:
+  \begin{enumerate}
+  \item Make sure you have the correct write capabilities on your
+    laptop to update \R and install and update packages.
+
+    Make sure you are connected to the internet.
+  \item Update your \R to \R~4.0.3, if necessary, and update your
+    currently installed packages to the latest CRAN versions.
+    
+  \item Make sure you have \RStudio installed and upgraded to the
+    latest release.
+    
+  \item From within an \R session, run the script
+    \verb|WWR_packages_2021.R| to install any required new packages
+    you will need for the workshop.
+    
+  \item Download the file \verb|WWR_2021.zip| from the link below and
+    expand it to provide the \verb|WWR_2021| folder, where you wish to
+    locate it for use as the working directory during the workshop.
+    \begin{description}
+    \item[NOTE 1:] This {\tt .zip} folder will be
+      available on memory sticks at the workshop itself.  So if there
+      is any problem, apart from updating \R itself, it can be fixed
+      at the workshop itself as necessary.
+    \item[NOTE 2:] Users with \git and some experience with using it
+      may prefer to clone the \github repo directly.  The
+      relevant address is
+      \begin{center}
+        \url{https://github.com/BillVenables/WWR_2021}
+      \end{center}
+      Alternatively the folder can be downloaded as a \verb|.zip| from
+      this same address.  You should be able to go to the tab:
+      \begin{center}
+        \texttt{Code} $\longrightarrow$ \texttt{Download ZIP}
+      \end{center}
+
+    \end{description}
+  \item This should complete your preparations for the workshop.  If
+    you need further help you are free to contact Bill Venables at
+    this email address:
+    \href{mailto:Bill.Venables@gmail.com}{Bill.Venables@gmail.com}.
+ 
+  \end{enumerate}
+
+        
+
+\section{Links}
+\label{sec:links}
+
+<section yet to come>
+
+Good luck, and welcome to the workshop!
+
+
+
+
+\end{document}
+
+https://www.dropbox.com/s/voqqr53v1amnjmk/WWR_2020.zip?dl=0
+
+https://www.dropbox.com/s/u4cy0ftfkucchjc/WWRData_0.1.0.tar.gz?dl=0
+https://www.dropbox.com/s/8dsho00z4c0ii1k/WWRGraphics_0.1.2.tar.gz?dl=0
+https://www.dropbox.com/s/0vk38t5lkr6wfa4/WWRUtilities_0.1.2.tar.gz?dl=0
+https://www.dropbox.com/s/dvn4fn7231vmyf6/WWRCourse_0.2.2.tar.gz?dl=0
+
+https://www.dropbox.com/s/2ovxsjx9cry2net/WWR_install_packages.R?dl=0
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: t
+%%% End:

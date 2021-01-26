@@ -37,8 +37,8 @@ if(!with(base::version, major >= 4 && minor >= 0)) {
       cat("Oops!  You don't appear not to have an internet connection!")
     } else {
       if(!is.null(old.packages())) {
-        cat(" Some of your packages have newer versions available.  Update?\n",
-            "Use\n\tupdate.packages(ask = FALSE, checkBuilt = TRUE)\n")
+        cat(" Some of your packages have newer versions available.  To update\n",
+            "use\n\tupdate.packages(ask = FALSE, checkBuilt = TRUE)\n")
       }
       
       
@@ -53,20 +53,31 @@ if(!with(base::version, major >= 4 && minor >= 0)) {
       #            "rbenchmark",     "scales",         "styler",         "sudokuAlt",  
       #            "tidyverse",      "visreg",         "xtable")  
       
-      # Bill's original packages plus Rhetta's R Shiny related packages
-      .pkgs <- c("C50",               "GGally",         "MASSExtra",    "Rcpp",           
-                 "SOAR",              "devtools",       "data.table",   "doParallel",     
-                 "doRNG",             "DT",             "english",      "fractional",     
-                 "gbm",               "ggrepel",        "ggthemes",     "golem",
-                 "gridExtra",         "knitr",          "lazyData",     "leaflet",
-                 "leaflet.providers", "lme4",           "mboost",       "microbenchmark",     
-                 "mlbench",           "patchwork",      "plotly",       "pingr",              
-                 "plumbr",            "randomForest",   "rbenchmark",   "rgdal",
-                 "scales",            "shiny",          "shinyAce",     "shinydashboard",
-                 "shinydashboardPlus","shinyEffects",   "shinyjqui",    "shiny.semantic",
-                 "shinythemes",        "shinyWidgets",  "styler",       "sudokuAlt", 
-                 "tidyverse",          "visreg",        "xtable")   
+      # Bill's original packages plus Rhetta's R Shiny related packages (take 1)
+      # .pkgs <- c("C50",               "GGally",         "MASSExtra",    "Rcpp",           
+      #            "SOAR",              "devtools",       "data.table",   "doParallel",     
+      #            "doRNG",             "DT",             "english",      "fractional",     
+      #            "gbm",               "ggrepel",        "ggthemes",     "golem",
+      #            "gridExtra",         "knitr",          "lazyData",     "leaflet",
+      #            "leaflet.providers", "lme4",           "mboost",       "microbenchmark",     
+      #            "mlbench",           "patchwork",      "plotly",       "pingr",              
+      #            "plumbr",            "randomForest",   "rbenchmark",   "rgdal",
+      #            "scales",            "shiny",          "shinyAce",     "shinydashboard",
+      #            "shinydashboardPlus","shinyEffects",   "shinyjqui",    "shiny.semantic",
+      #            "shinythemes",        "shinyWidgets",  "styler",       "sudokuAlt", 
+      #            "tidyverse",          "visreg",        "xtable", "shinycssloaders")   
       
+      .pkgs <- c("C50",                "data.table",         "devtools",           "doParallel",        
+                 "doRNG",              "english",            "fractional",         "gbm", 
+                 "GGally",             "ggrepel",            "ggthemes",           "gridExtra",
+                 "knitr",              "lazyData",           "leaflet",            "leaflet.providers", 
+                 "lme4",               "MASSExtra",          "mboost",             "microbenchmark",
+                 "mlbench",            "patchwork",          "pingr",              "randomForest",      
+                 "rbenchmark",         "Rcpp",               "rgdal",              "scales",            
+                 "shiny",              "shinyAce",           "shinycssloaders",    "shinydashboard",
+                 "shinydashboardPlus", "shinyEffects",       "shinyjqui",          "shinyWidgets", 
+                 "SOAR",               "styler",             "sudokuAlt",          "tidyverse",
+                 "visreg",             "xtable")
       
       .apkgs <- rownames(available.packages())
       .githubs <- c("searchpath", 
