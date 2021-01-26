@@ -20,12 +20,15 @@ knitr::opts_chunk$set(echo = FALSE)
 
     -   Demonstration of inline apps:
 
-      -   shinyApp() function
-      
+    -   shinyApp() function
+
     -   Demonstration of embedding full apps:
 
-      -   using app URL
+    -   using app URL
 
+    ```{=html}
+    <!-- -->
+    ```
         -   For more: <https://bookdown.org/yihui/rmarkdown/shiny-documents.html>
 
 -   interactive mapping with leaflet
@@ -48,32 +51,24 @@ knitr::opts_chunk$set(echo = FALSE)
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #load packages
 suppressPackageStartupMessages({
+   #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  #    DATA and MAPPING PACKAGES
+  #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   #geospatial stuff
   library(rgdal)
-  library(maptools)
   library(rgeos)
   library(sp)
-  library(sf)
   library(leaflet)
   library(leaflet.providers)
   #data wrangling
   library(data.table)
   library(tidyverse) 
   library(reshape2)
-  #library(packrat)
-  library(sqldf)
-  library(tidyr)
-  #text
-  #visualisation
-  library(plotly)
-  library(RColorBrewer)
   library(scales)
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   #     SHINY RELATED PACKAGES
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   library(shiny)
-  library(shinythemes)
-  library(shinydashboard)
   library(shinyWidgets)
   library(shinyalert)
   library(shinydashboardPlus)
@@ -81,10 +76,8 @@ suppressPackageStartupMessages({
   library(styler)
   library(shinyAce)
   library(shinyEffects)
-  library(htmlwidgets)
-  library(htmltools)
-  library(htmlTable)
   library(shinycssloaders)
+  library(rsconnect)
 })
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -620,4 +613,3 @@ shinyApp(
 knitr::include_app("https://regionalinnovationdatalab.shinyapps.io/Logan_Food_Mapping/", 
   height = "700px")
 ```
-
