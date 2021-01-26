@@ -18,45 +18,19 @@ knitr::opts_chunk$set(echo = FALSE)
 
 Demonstrate how Shiny apps, widgets and components can be integrated with .Rmd documents ( .html, ioslides, presenter mode)
 
--    Demonstration of inline apps:
-<<<<<<< HEAD:Shiny/Code_Slides/Bright_Shiny_Objects_HTML.Rmd
-
-    -   shinyApp() function
-<<<<<<< HEAD:Shiny/Code_Slides/Bright_Shiny_Objects_Preso.Rmd
-
-    -   Demonstration of embedding full apps:
-
-    -   using app URL
-
-    ```{=html}
-    <!-- -->
-    ```
-        -   For more: <https://bookdown.org/yihui/rmarkdown/shiny-documents.html>
-=======
-
--   Demonstration of embedding full apps:
-
-    -   using app URL
->>>>>>> 5c5a5de2c7918247536d803f7645de0fb6ea9b27:Shiny/Code_Slides/Bright_Shiny_Objects_HTML.Rmd
-
-    For more: \<https://bookdown.org/yihui/rmarkdown/shiny-documents.html\>
-
-=======
+-   Demonstration of inline apps:
 
     -   shinyApp() function
 
--   Demonstration of embedding full apps:
-
-    -   using app URL
-
-    For more: \<https://bookdown.org/yihui/rmarkdown/shiny-documents.html\>
-
->>>>>>> 5c5a5de2c7918247536d803f7645de0fb6ea9b27:Shiny/Code_Slides/Bright_Shiny_Objects_Preso.Rmd
--   Interactive mapping with leaflet
-
-    -   adding grouped and custom markers to a leaflet map
+    -    adding grouped and custom markers to a leaflet map
 
     -   cluster markers
+
+-   Demonstration of embedding full apps:
+
+    -   using app URL
+
+    For more: [Yi Hui - Shiny Documents](https://bookdown.org/yihui/rmarkdown/shiny-documents.html "Shiny Documents Book")
 
 ### R Shiny & R Markdown \| Getting started
 
@@ -97,7 +71,6 @@ suppressPackageStartupMessages({
   library(tidyverse) 
 
   #visualisation
-  library(plotly)
   library(scales)
   
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
