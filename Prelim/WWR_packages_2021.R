@@ -68,6 +68,7 @@ if(!with(base::version, major >= 4 && minor >= 0)) {
       #            "tidyverse",          "visreg",        "xtable", "shinycssloaders")   
       
       .pkgs <- c("C50",                "data.table",         "devtools",           "doParallel",        
+<<<<<<< HEAD
                  "doRNG",              "english",            "fractional",         "gbm", 
                  "GGally",             "ggrepel",            "ggthemes",           "gridExtra",
                  "knitr",              "lazyData",           "leaflet",            "leaflet.providers", 
@@ -78,6 +79,19 @@ if(!with(base::version, major >= 4 && minor >= 0)) {
                  "shinydashboardPlus", "shinyEffects",       "shinyjqui",          "shinyWidgets", 
                  "SOAR",               "styler",             "sudokuAlt",          "tidyverse",
                  "visreg",             "xtable")
+=======
+                 "doRNG",              "DT",                 "english",            "fractional",        
+                 "gbm",                "GGally",             "ggrepel",            "ggthemes",          
+                 "golem",              "gridExtra",          "knitr",              "lazyData",          
+                 "leaflet",            "leaflet.providers",  "lme4",               "MASSExtra",         
+                 "mboost",             "microbenchmark",     "mlbench",            "patchwork",         
+                 "pingr",              "plotly",             "plumbr",             "randomForest",      
+                 "rbenchmark",         "Rcpp",               "rgdal",              "scales",            
+                 "shiny",              "shiny.semantic",     "shinyAce",           "shinycssloaders",   
+                 "shinydashboard",     "shinydashboardPlus", "shinyEffects",       "shinyjqui",         
+                 "shinythemes",        "shinyWidgets",       "SOAR",               "styler",            
+                 "sudokuAlt",          "tidyverse",          "visreg",             "xtable")
+>>>>>>> 5c5a5de2c7918247536d803f7645de0fb6ea9b27
       
       .apkgs <- rownames(available.packages())
       .githubs <- c("searchpath", 

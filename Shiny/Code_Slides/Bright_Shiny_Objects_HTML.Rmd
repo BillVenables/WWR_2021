@@ -19,6 +19,7 @@ knitr::opts_chunk$set(echo = FALSE)
 Demonstrate how Shiny apps, widgets and components can be integrated with .Rmd documents ( .html, ioslides, presenter mode)
 
 -    Demonstration of inline apps:
+<<<<<<< HEAD:Shiny/Code_Slides/Bright_Shiny_Objects_HTML.Rmd
 
     -   shinyApp() function
 <<<<<<< HEAD:Shiny/Code_Slides/Bright_Shiny_Objects_Preso.Rmd
@@ -40,6 +41,17 @@ Demonstrate how Shiny apps, widgets and components can be integrated with .Rmd d
 
     For more: \<https://bookdown.org/yihui/rmarkdown/shiny-documents.html\>
 
+=======
+
+    -   shinyApp() function
+
+-   Demonstration of embedding full apps:
+
+    -   using app URL
+
+    For more: \<https://bookdown.org/yihui/rmarkdown/shiny-documents.html\>
+
+>>>>>>> 5c5a5de2c7918247536d803f7645de0fb6ea9b27:Shiny/Code_Slides/Bright_Shiny_Objects_Preso.Rmd
 -   Interactive mapping with leaflet
 
     -   adding grouped and custom markers to a leaflet map
@@ -68,22 +80,37 @@ Demonstrate how Shiny apps, widgets and components can be integrated with .Rmd d
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #load packages
 suppressPackageStartupMessages({
+<<<<<<< HEAD:Shiny/Code_Slides/Bright_Shiny_Objects_HTML.Rmd
 
    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   #    DATA and MAPPING PACKAGES
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   #geospatial/ mapping
   library(rgdal)
+=======
+  #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  #     Data prep, gis and  data vis packages
+  #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  #geospatial/ mapping
+>>>>>>> 5c5a5de2c7918247536d803f7645de0fb6ea9b27:Shiny/Code_Slides/Bright_Shiny_Objects_Preso.Rmd
   library(leaflet)
   library(leaflet.providers)
   library(rgdal)
   library(sp)
+<<<<<<< HEAD:Shiny/Code_Slides/Bright_Shiny_Objects_HTML.Rmd
   
   #data wrangling
   library(data.table)
   library(tidyverse) 
 
   #visualisation
+=======
+  #data wrangling
+  library(data.table)
+  library(tidyverse) 
+  #visualisation
+  library(plotly)
+>>>>>>> 5c5a5de2c7918247536d803f7645de0fb6ea9b27:Shiny/Code_Slides/Bright_Shiny_Objects_Preso.Rmd
   library(scales)
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   #     SHINY RELATED PACKAGES
@@ -98,7 +125,10 @@ suppressPackageStartupMessages({
   library(shinyEffects)
   library(shinycssloaders)
   library(rsconnect)
+<<<<<<< HEAD:Shiny/Code_Slides/Bright_Shiny_Objects_HTML.Rmd
   
+=======
+>>>>>>> 5c5a5de2c7918247536d803f7645de0fb6ea9b27:Shiny/Code_Slides/Bright_Shiny_Objects_Preso.Rmd
 })
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
