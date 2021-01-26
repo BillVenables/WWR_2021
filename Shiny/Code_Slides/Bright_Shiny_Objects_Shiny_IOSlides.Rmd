@@ -68,7 +68,6 @@ suppressPackageStartupMessages({
   library(data.table)
   library(tidyverse) 
   #visualisation
-  library(plotly)
   library(scales)
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   #     SHINY RELATED PACKAGES
