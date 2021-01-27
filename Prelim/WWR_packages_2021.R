@@ -67,31 +67,20 @@ if(!with(base::version, major >= 4 && minor >= 0)) {
       #            "shinythemes",        "shinyWidgets",  "styler",       "sudokuAlt", 
       #            "tidyverse",          "visreg",        "xtable", "shinycssloaders")   
       
-      .pkgs <- c("C50",                "data.table",         "devtools",           "doParallel",        
-<<<<<<< HEAD
-                 "doRNG",              "english",            "fractional",         "gbm", 
-                 "GGally",             "ggrepel",            "ggthemes",           "gridExtra",
-                 "knitr",              "lazyData",           "leaflet",            "leaflet.providers", 
-                 "lme4",               "MASSExtra",          "mboost",             "microbenchmark",
-                 "mlbench",            "patchwork",          "pingr",              "randomForest",      
-                 "rbenchmark",         "Rcpp",               "rgdal",              "scales",            
-                 "shiny",              "shinyAce",           "shinycssloaders",    "shinydashboard",
-                 "shinydashboardPlus", "shinyEffects",       "shinyjqui",          "shinyWidgets", 
-                 "SOAR",               "styler",             "sudokuAlt",          "tidyverse",
-                 "visreg",             "xtable")
-=======
-                 "doRNG",              "DT",                 "english",            "fractional",        
-                 "gbm",                "GGally",             "ggrepel",            "ggthemes",          
-                 "golem",              "gridExtra",          "knitr",              "lazyData",          
-                 "leaflet",            "leaflet.providers",  "lme4",               "MASSExtra",         
-                 "mboost",             "microbenchmark",     "mlbench",            "patchwork",         
-                 "pingr",              "plotly",             "plumbr",             "randomForest",      
-                 "rbenchmark",         "Rcpp",               "rgdal",              "scales",            
-                 "shiny",              "shiny.semantic",     "shinyAce",           "shinycssloaders",   
-                 "shinydashboard",     "shinydashboardPlus", "shinyEffects",       "shinyjqui",         
-                 "shinythemes",        "shinyWidgets",       "SOAR",               "styler",            
-                 "sudokuAlt",          "tidyverse",          "visreg",             "xtable")
->>>>>>> 5c5a5de2c7918247536d803f7645de0fb6ea9b27
+      # Bill's original packages plus Rhetta's R Shiny related packages (take 2)
+      .pkgs <- c("C50",             "GGally",            "MASSExtra",        "Rcpp",           
+                 "SOAR",            "devtools",         "data.table",        "doParallel",     
+                 "doRNG",           "english",          "fractional",        "gbm",           
+                 "ggrepel",         "ggthemes",         "gridExtra",         "knitr",          
+                 "lazyData",        "leaflet",          "leaflet.providers", "lme4", 
+                 "mboost",          "microbenchmark",   "mlbench",           "patchwork", 
+                 "pingr",           "randomForest",     "rbenchmark",        "rgdal",
+                 "scales",          "shiny",            "shinyAce",          "shinyalert",
+                 "shinycssloaders", "shinydashboard",   "shinydashboardPlus","shinyEffects",
+                 "shinyjqui",       "shinythemes",      "shinyWidgets",      "sp",
+                 "styler",          "sudokuAlt",         "tidyverse",         "visreg", 
+                 "xtable")
+
       
       .apkgs <- rownames(available.packages())
       .githubs <- c("searchpath", 
