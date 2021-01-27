@@ -68,7 +68,6 @@ suppressPackageStartupMessages({
   library(data.table)
   library(tidyverse) 
   #visualisation
-  library(plotly)
   library(scales)
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   #     SHINY RELATED PACKAGES
@@ -84,7 +83,7 @@ suppressPackageStartupMessages({
   library(shinyAce)
   library(shinyEffects)
   library(shinycssloaders)
-  library(rsconnect)
+  
 })
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

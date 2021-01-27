@@ -83,7 +83,7 @@ suppressPackageStartupMessages({
   library(shinyAce)
   library(shinyEffects)
   library(shinycssloaders)
-  library(rsconnect)
+  
 
 })
 
