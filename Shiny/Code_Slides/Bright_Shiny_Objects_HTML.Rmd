@@ -22,7 +22,7 @@ Demonstrate how Shiny apps, widgets and components can be integrated with .Rmd d
 
     -   shinyApp() function
 
-    -    adding grouped and custom markers to a leaflet map
+    -   adding grouped and custom markers to a leaflet map
 
     -   cluster markers
 
@@ -55,12 +55,10 @@ Demonstrate how Shiny apps, widgets and components can be integrated with .Rmd d
 #load packages
 suppressPackageStartupMessages({
 
-  #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   #     Data prep, gis and  data vis packages
-  #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   #geospatial/ mapping
-  
-  library(rgdal)
   library(leaflet)
   library(leaflet.providers)
   library(rgdal)
@@ -73,9 +71,9 @@ suppressPackageStartupMessages({
   #visualisation
   library(scales)
   
-  #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   #     SHINY RELATED PACKAGES
-  #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   library(shiny)
   library(shinyWidgets)
   library(shinyalert)
