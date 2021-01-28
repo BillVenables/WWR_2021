@@ -1,9 +1,11 @@
+#THIS EXAMPLE IS FROM: https://predictivehacks.com/how-to-share-your-machine-learning-models-with-shiny/
+
+
 library(shiny)
 library(DT)
 library(tidyverse)
-#library(nnet)
+#library(nnet) - for model only 
 
-#THIS EXAMPLE IS FROM: https://predictivehacks.com/how-to-share-your-machine-learning-models-with-shiny/
 
 # #code for model - multinomial logistic regression
 # irisModel<-multinom(Species~Sepal.Length+Sepal.Width+Petal.Length+Petal.Width,data = iris)
@@ -30,19 +32,20 @@ ui <- fluidPage(
                  #acceptable input file types
                  accept = c("text/csv",
                            "text/comma-separated-values,text/plain",
-                           ".csv")), 
+                           ".csv")
+                 ), # end fileInput
       
       
       # Button - once model has produced predictions allow users to download
       downloadButton("downloadData", "Download the Predictions")
-    ),
+    ),# end sidebarPanel
     
     # Show the table with the predictions
     mainPanel(
       DT::dataTableOutput("mytable")
-    )
-  )
-)
+    )# end mainPanel
+  )# end sidebar Layout
+) #end fluidPage (UI)
 
 # Define server logic required to draw a histogram
 server <- function(input, output) {
@@ -58,14 +61,14 @@ server <- function(input, output) {
     #return the updated df with the new prediction column
     return(df)
     
-  })
+  })# end reactiveDF
   
   #display the predictions in a table on the app
   output$mytable = DT::renderDataTable({
     req(input$file1)
     
     return(DT::datatable(reactiveDF(),  options = list(pageLength = 100), filter = c("top")))
-  })
+  }) # end mytable output
   
   
   # Downloadable csv of selected dataset ----
@@ -76,11 +79,11 @@ server <- function(input, output) {
     content = function(file) {
       write.csv(reactiveDF(), file, row.names = FALSE)
     }
-  )
+  )# end download data output
   
   
   
-}
+} # end server
 
 # Run the application 
 shinyApp(ui = ui, server = server)
