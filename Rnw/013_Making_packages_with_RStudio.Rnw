@@ -51,8 +51,10 @@ session <- sub("^0+", "", sub("[^[:digit:][:alpha:]].*$", "", .infile))
 \tableofcontents
 \end{footnotesize}
 \newslide
+\section{Preliminaries}
+\label{sec:preparations.}
 
-\section{Why packages?}
+\subsection{Why packages?}
 \label{sec:packages}
 
 \begin{itemize}
@@ -66,23 +68,23 @@ session <- sub("^0+", "", sub("[^[:digit:][:alpha:]].*$", "", .infile))
   submission to \rfile{CRAN} or \rfile{bioconductor}.
 \end{itemize}
 \newslide
-\section{Where should packages be installed?}
+\subsection{Where should packages be installed?}
 \label{sec:Where should packages be installed?}
 
 \begin{itemize}
-  \item A new package starts out as a \code{working directory} of a
-      special structure, as we will discover.  On \RStudio this will
+  \item A new package starts out as a \code{working directory} with a
+      special structure.  On \RStudio this will
       be a \code{package project}.
   \item When a package is ready, it is \code{built} into a \code{source}
     package, which is a single compressed file containing the \code{package
     project}, but with some additions and modifications.  This is the
-    ``tape archive'' file, such as {\color{blue}\verb|WWRCourse_0.1.0.tar.gz|} that
+    ``tape archive'' file, such as {\color{blue}\verb|WWRCourse_0.2.3.tar.gz|} that
     we used for the course materials.
   \item A source package may alternatively be built as a \code{binary package},
     which is now specific to the operating system.
 
     On \Windows, a binary version of our course package
-    would be called {\color{blue}\verb|WWRCourse_0.1.0.zip|}.  This then allows faster installation,
+    would be called {\color{blue}\verb|WWRCourse_0.2.3.zip|}.  This then allows faster installation,
     does not require the extra software tools needed to build it, but is specific
     to the operating system.
 \newslide
@@ -109,12 +111,12 @@ session <- sub("^0+", "", sub("[^[:digit:][:alpha:]].*$", "", .infile))
 <<line_109_,eval=FALSE>>=
 if(!dir.exists("~/R/win-library/4.0")) {
   if(dir.create("~/R/win-library/4.0", recursive = TRUE)) {
-    cat("The folder'"~/R/win-library/4.0"' successfully created\n")
+    cat("The folder '"~/R/win-library/4.0"' successfully created\n")
   } else {
-    cat("The folder'"~/R/win-library/4.0"' cannot be created!\n")
+    cat("The folder '"~/R/win-library/4.0"' cannot be created!\n")
   }
 } else {
-  cat("The folder'"~/R/win-library/4.0"' already exists\n")
+  cat("The folder '"~/R/win-library/4.0"' already exists\n")
 }
 @
 
@@ -127,105 +129,111 @@ if(!dir.exists("~/R/win-library/4.0")) {
 
 \newslide
 
-\section{Preparations}
-\label{sec:preparations.}
-To build your own packages on \Windows you will need some things in
-place before you start.
+\subsection{Tools}
+Simple packages not involving compiled code may be made using only the basic
+tools provided by \R itself.  We see an example later.
 
-\begin{itemize}
-\item A working version of \rcode{MiKTeX}, preferably the latest.
-  This is to build the documentation files
-\item You will probably do at least part of the work from a command
-  window of some kind.  The native \Windows one is adequate, but
-  irritating.  If you have a \Unix background, you may prefer to
-  install the \rcode{cygwin} tools and use the \rcode{bash} shell.
-\item You should have \R visible on your \rfile{PATH} environment variable.
+For packages involving compiled code, extra compiler tools are needed, but these
+are available in convenient forms for \Windows and \MacOS, (and for \Linux they
+are generally part of the operating system suite, anyway).
 
-  From \R-2.12.0 this can be a little tricky, since 32-bit and 64-bit
-  \R can coexist on the same machine, and the structure of
-  \verb|R_HOME| has changed from previous releases.
-\item There is a suite of tools known as \rfile{RTools} for \Windows
-  which is essentially a complete set needed to build packages (and
-  even \R itself) from source.  These are available as a \Windows
-  installer from Duncan Murdoch's website in Canada,
-  \href{http://www.murdoch-sutherland.com/Rtools/}.
-\item The \rfile{Rtools} suite contains compilers and various \Unix
-  tools needed by the scripts which build the packages. These
-  sometimes clash with \rfile{cygwin} versions of the same tools.
-  This requires some care when setting up the \rcode{PATH} variable.
-\item There are two reasons to have a working \TeX{} implementation.
-  The first is to allow \R to make a \verb|.pdf| version of the package
-  manual (automatically produced during building).  The second is to
-  write high-quality vignettes, for which you need \LaTeX{} and
-  also how to write documents using \rcode{knitr}, though these days
-  most people squib out of using \LaTeX (or, more precisely, \verb|.Rnw|
-  files and instead use \verb|.Rmd| files instead.)
-  
-\item Vignettes are essentially a requirement for packages you want
-  to publish, \emph{and you want people to use!}  RMarkdown \verb|.Rmd|
-  files are now popular, and elementary versions are easy to write,
-  but they are limited in what they offer.  Cross references and
-  automatic numbering and labels for figures and diagrams are, in
-  particular, not well handled, unless you from RMarkdown to
-  the more developed 'bookdown' package(s).  At this point, however,
-  your learning curve is nearly a steep as it is for \LaTeX{} itself.
-\item  
-  Some knowledge of \LaTeX{} is needed however you go, as mathematical
-  symbols and equations are handled using \verb|MathJax|, which uses
-  \LaTeX{} coding conventions for inserts,
-  and calls upon a \LaTeX{} engine to render them.
-  
-  
-  
-\item Read the appropriate sections of \emph{Writing \R Extensions}.
-  This is a terse, dense but exquisitely accurate piece of writing,
-  which no one should read unless they have done so at least once
-  before.
-\end{itemize}
+\textit{Details of the extra tools are summarised in the preliminary sheet sent out 
+before the start of the workshop.}
+
+% \begin{itemize}
+% \item A working version of \rcode{MiKTeX}, preferably the latest.
+%   This is to build the documentation files
+% \item You will probably do at least part of the work from a command
+%   window of some kind.  The native \Windows one is adequate, but
+%   irritating.  If you have a \Unix background, you may prefer to
+%   install the \rcode{cygwin} tools and use the \rcode{bash} shell.
+% \item You should have \R visible on your \rfile{PATH} environment variable.
+% 
+%   From \R-2.12.0 this can be a little tricky, since 32-bit and 64-bit
+%   \R can coexist on the same machine, and the structure of
+%   \verb|R_HOME| has changed from previous releases.
+% \item There is a suite of tools known as \rfile{RTools} for \Windows
+%   which is essentially a complete set needed to build packages (and
+%   even \R itself) from source.  These are available as a \Windows
+%   installer from Duncan Murdoch's website in Canada,
+%   \href{http://www.murdoch-sutherland.com/Rtools/}.
+% \item The \rfile{Rtools} suite contains compilers and various \Unix
+%   tools needed by the scripts which build the packages. These
+%   sometimes clash with \rfile{cygwin} versions of the same tools.
+%   This requires some care when setting up the \rcode{PATH} variable.
+% \item There are two reasons to have a working \TeX{} implementation.
+%   The first is to allow \R to make a \verb|.pdf| version of the package
+%   manual (automatically produced during building).  The second is to
+%   write high-quality vignettes, for which you need \LaTeX{} and
+%   also how to write documents using \rcode{knitr}, though these days
+%   most people squib out of using \LaTeX (or, more precisely, \verb|.Rnw|
+%   files and instead use \verb|.Rmd| files instead.)
+%   
+% \item Vignettes are essentially a requirement for packages you want
+%   to publish, \emph{and you want people to use!}  RMarkdown \verb|.Rmd|
+%   files are now popular, and elementary versions are easy to write,
+%   but they are limited in what they offer.  Cross references and
+%   automatic numbering and labels for figures and diagrams are, in
+%   particular, not well handled, unless you from RMarkdown to
+%   the more developed 'bookdown' package(s).  At this point, however,
+%   your learning curve is nearly a steep as it is for \LaTeX{} itself.
+% \item  
+%   Some knowledge of \LaTeX{} is needed however you go, as mathematical
+%   symbols and equations are handled using \verb|MathJax|, which uses
+%   \LaTeX{} coding conventions for inserts,
+%   and calls upon a \LaTeX{} engine to render them.
+%   
+%   
+%   
+% \item Read the appropriate sections of \emph{Writing \R Extensions}.
+%   This is a terse, dense but exquisitely accurate piece of writing,
+%   which no one should read unless they have done so at least once
+%   before.
+% \end{itemize}
+% \newslide
+% 
+% \section{First steps and gratuitous advice}
+% \label{sec:firststeps}
+% 
+% \begin{itemize}
+% \item Decide on the limits of what you want to put into your package,
+%   and avoid ``creeping featurism''.  The package should have a clear
+%   focus and be free of all unnecessary extraneous elements.  (This can
+%   sometimes be harder than most people appreciate.)
+% 
+%   Writing several small, tightly focused packages is always better
+%   than a conglomerate with no fixed focus.  This also makes your
+%   package fit in more easily with others who may want to ``piggy
+%   back'' onto it.
+% 
+% \item Assemble your \R code into a single code file, say
+%   \rfile{myPackageCode.R}.  This is not strictly necessary, but it
+%   simplifies things later.
+% 
+% \item In writing your code, work \emph{with} \R, not \emph{against}
+%   it.  Do things the \R way---don't try to make \R do thing
+%   \emph{your} way (unless they coincide, of course!).
+% \newslide
+%   In particular
+%   \begin{itemize}
+%   \item Do \emph{not} do any printing outside \rcode{print} methods.
+%     The user should be in control of printed output.  Even
+%     \rcode{summary} methods should \emph{not} print directly.
+%   \item Avoid side effects in your code and in particular do
+%     \emph{not} create objects in the global environment,
+%     \rcode{.GlobalEnv}, (and more importantly, do not destroy any!).
+%   \end{itemize}
+% 
+% \item  This also allows the \R community to make more use of your work, and
+%   you theirs.
+% \item If you have any code to be compiled and loaded as part of your
+%   package, make sure this also does not require input or output that
+%   the user cannot control.
+% \end{itemize}
+% 
 \newslide
 
-\section{First steps and gratuitous advice}
-\label{sec:firststeps}
-
-\begin{itemize}
-\item Decide on the limits of what you want to put into your package,
-  and avoid ``creeping featurism''.  The package should have a clear
-  focus and be free of all unnecessary extraneous elements.  (This can
-  sometimes be harder than most people appreciate.)
-
-  Writing several small, tightly focused packages is always better
-  than a conglomerate with no fixed focus.  This also makes your
-  package fit in more easily with others who may want to ``piggy
-  back'' onto it.
-
-\item Assemble your \R code into a single code file, say
-  \rfile{myPackageCode.R}.  This is not strictly necessary, but it
-  simplifies things later.
-
-\item In writing your code, work \emph{with} \R, not \emph{against}
-  it.  Do things the \R way---don't try to make \R do thing
-  \emph{your} way (unless they coincide, of course!).
-\newslide
-  In particular
-  \begin{itemize}
-  \item Do \emph{not} do any printing outside \rcode{print} methods.
-    The user should be in control of printed output.  Even
-    \rcode{summary} methods should \emph{not} print directly.
-  \item Avoid side effects in your code and in particular do
-    \emph{not} create objects in the global environment,
-    \rcode{.GlobalEnv}, (and more importantly, do not destroy any!).
-  \end{itemize}
-
-\item  This also allows the \R community to make more use of your work, and
-  you theirs.
-\item If you have any code to be compiled and loaded as part of your
-  package, make sure this also does not require input or output that
-  the user cannot control.
-\end{itemize}
-
-\newslide
-
-\section{Structure of a package}
+\subsection{Structure of a package}
 \label{sec:structure-package}
 
 \begin{itemize}
@@ -339,48 +347,193 @@ for this is by default \rfile{Ctrl-Alt-Shift-R}, (what else?), but may be change
 I have chosen to change it to \rfile{F12}.
 
 \newslide
+\section{Example 1: Make Round Robin Tournaments}
 
-\section{Example 1: Pure \R code only}
-\label{sec:example-1:-pure}
+There is a neat algorithm for  doing this sometimes tricky task:
 
-This is the easy case.  The steps are:
+<<echo=FALSE, out.width="100%", fig.width=10,fig.height=4.5>>=
+searchpath::use_packages(WWRGraphics)
+
+pts <- expand.grid(x = 1:2, y = 1:5) %>% within(y <- 6-y)
+
+z <- with(pts, complex(nrow(pts),x,y))
+rotate <- c(2,3,5,7,9, 10, 8, 6, 4)
+z1 <- z[rotate]
+
+layout(rbind(1:4))
+plot.new()
+par(mar = rep(0, 4), usr = c(0, 3, 0, 6))
+# points(z, pch=20, cex = 0.7, col = "firebrick4")
+text(z, labels = paste0("T", 0:9), cex = 2.5, col = "firebrick4", family = "sans")
+segments(0.5, 0.5 + 0:5, 2.5, 0.5 + 0:5)
+segments(0.5 + c(0, 2), 0.5, 0.5 + c(0, 2), 5.5)
+text(1.5, 5.75, "Round 1", cex = 2.5, family = "sans")
+
+plot.new()
+par(mar = rep(0, 4), usr = c(0, 3, 0, 6))
+points(z, pch=20, cex = 1, col = "firebrick4")
+# text(z, labels = paste0("T", 0:9), pos = rep(c(2, 4), 5), cex=1.5)
+segments(0.5, 0.5 + 0:5, 2.5, 0.5 + 0:5)
+segments(0.5 + c(0, 2), 0.5, 0.5 + c(0, 2), 5.5)
+text(1.5, 5.75, "(Circulate)", cex = 2.5, family = "sans")
+
+arrows(z1, circular = TRUE, gap = 2, angle = 15, length = 2, col=4)
+
+plot.new()
+par(mar = rep(0, 4), usr = c(0, 3, 0, 6))
+# points(z, pch=20, cex = 0.7, col = "firebrick4")
+text(z, labels = paste0("T", c(0, 3, 1, 5, 2, 7, 4, 9, 6, 8)), cex = 2.5, col = "firebrick4", family = "sans")
+text(1.5, 5.75, "Round 2", cex = 2.5, family = "sans")
+segments(0.5, 0.5 + 0:5, 2.5, 0.5 + 0:5)
+segments(0.5 + c(0, 2), 0.5, 0.5 + c(0, 2), 5.5)
+
+plot.new()
+par(mar = rep(0, 4), usr = c(0, 3, 0, 6))
+points(z, pch=20, cex = 1, col = "firebrick4")
+# text(z, labels = paste0("T", 0:9), pos = rep(c(2, 4), 5), cex=1.5)
+segments(0.5, 0.5 + 0:5, 2.5, 0.5 + 0:5)
+segments(0.5 + c(0, 2), 0.5, 0.5 + c(0, 2), 5.5)
+text(1.5, 5.75, "(Circulate)", cex = 2.5, family = "sans")
+
+arrows(z1, circular = TRUE, gap = 2, angle = 15, length = 2, col=4)
+
+@
+
+How can we implement this in \R?  We'll make  a package for re-use.
+\newslide
+\section*{Case 1: The no-frills version} 
+
+A basic code for a function to make a tournament could be:
+<<>>=
+tournament <- function(teams) {
+  if(length(teams) %% 2 == 1) { ## odd number of teams -> byes needed
+    teams <- c("<Bye>", teams)
+  }
+  n <- length(teams)
+  tournament <- vector(length = n-1, mode = "list")
+  for(j in 1:(n-1)) {
+    tournament[[j]] <- matrix(teams, ncol = 2)
+    teams <- teams[c(1, n/2+1, if(n/2 > 2) 2:(n/2-1), ## else NULL
+                     (n/2+2):n, n/2)]
+  }
+  return(tournament)
+}
+@
+To see what it does:
+\newslide
+<<out.lines=20>>=
+tournament(LETTERS[1:5]) ## Five (anonymous) teams!
+@
+\newslide
+The file \code{PackageMaterials/Example\_2/round\_rob.R} has a slightly more swish version of this function
+together with one extra function to provide a schedule, showing for each team
+which competitor they face in each of the rounds.
+
+Another important feature of this script is how it gives \rcode{class} attributes
+to the objects and provides \rcode{print} methods that deliver neater printed
+displays.
+\newslide
+
+We will now use this code to make a simple package.  The steps are as follows:
+
 \begin{itemize}
-\item Decide on what functions and other objects you wish to include
-  in your package.
-\item Write the code as \R scripts and enter the \rcode{roxygen}
-  comments \emph{for every object you wish to provide to users of your
-  package}.
+\item Start by making a special folder for the new \emph{package} 
+projects we are about to make.  I will assume this is \code{./Temp},
+that is a sub-folder of the workshop project folder.
+
 \item File $\longrightarrow$ New Project $\longrightarrow$ New
   directory $\longrightarrow$ \R Package
-\item Give the package a name (e.g. \rcode{ConvR})
+\item Give the package a name (e.g. \rcode{roundRob}).
+
+\begin{footnotesize}
+  NOTE: package name rules are similar to \R object name rules, but the
+\emph{may not} contain underscores.  \RStudio will ``pink out'' package
+names that violate these rules.
+\end{footnotesize}
+
 \item Add any code files using the \rfile{Add}
-  button. (e.g. \rfile{convolveR.R} in the \rfile{PackageMaterials/Example\_1}
-  sub-directory)
-\item Check that the new project is in the right subdirectory using
-  the \rfile{Browse} button if need be
-\item Click on \rfile{Create Project}.
-\newslide
-\item A new \RStudio session will start \emph{inside} the \R package
-  being constructed.  You should do several things next:
-  \begin{itemize}
-  \item Edit the \rfile{DESCRIPTION} file to complete all fields as
-    indicated.  At least add a newline at the end of the file.
-  \item Go to the \emph{More} button of the package \emph{Build} tab
-    and select \emph{Configure package build tools}. Tick the last
-    box to ensure \rcode{roxygen} is invoked to produce the \rfile{.Rd}
-    files and modify the \rfile{NAMESPACE} file.
-  \item Delete the temporary \rfile{NAMESPACE} file.
-  \item Click on \emph{Build \& reload} and cross your fingers!
-  \end{itemize}
-  If things have worked as they should, you should now be in a new \R
-  session with your newly created and installed package attached to
-  the search path. Check to see that the functions work.
+  button. (i.e. \rfile{./PackageMaterials/Example\_2/round\_rob.R}, but also
+  add the two data files \rfile{NRL.rda} and \rfile{AFWL.rda} from the same folder.)
+  
+\item Next move to the box ``\textit{Create a project that is a subdirectory of:}'' and
+\textit{Browse}  to select the \rfile{Temp} subfolder you have just created.
+
+\item Click on \rfile{Create Project} and stand well back.
 \end{itemize}
 
-The file \rfile{convolveR.R} in the \rfile{PackageMaterials/Example\_1} subdirectory
-may be used to try this out.  It has the \rcode{roxygen} comments
-already inserted, which you should study: there is an important short-cut
-employed.
+\newslide
+A new \RStudio session will start \emph{inside} the \R package
+being constructed.  At this stage all you have is a \emph{package project}.
+
+To \emph{build} the package you need to do one more step:
+\begin{itemize}
+  \item Go to the \code{Build} tab and select \code{Install and Restart}.
+\end{itemize}
+
+This will make an (embryonic) package and \emph{install} it in your default
+library (first position on \rcode{.libPaths()}).  \R will restart and the initial
+command
+<<eval=FALSE>>=
+library(roundRob)
+@
+will automatically be issued.
+
+Moreover your package will also contain a \rfile{data} subfolder with your two 
+data items.  One way to try out your new package would be
+<<eval=FALSE>>=
+tournament(NRL)
+@
+which should show you a potential preliminary round tournament for the NRL.
+
+\newslide
+There are \rcode{print} methods provided, but as these have not been \emph{registered}
+as such, they will not work as intended. You can, however, use the ungainly
+<<eval=FALSE>>=
+print.tournament(tournament(AFLW))
+@
+
+to see how the result should look.  We now see how we can do this, so clean up
+at this point and we will look at a more developed package.
+\begin{itemize}
+   \item Use \rcode{detach(package:roundRob)} to detach it from your \R session.
+   \item Uninstall this version of the package using \rcode{remove.packages("roundRob")}
+   \item Exit from your package project by \code{File} $\longrightarrow$ \code{Open project}
+   and re-start your workshop project again.
+   \item Delete the package project folder as well.  Do this with some care:
+<<eval=FALSE>>=
+dir("./Temp")  ## check that it's where you think it is
+unlink("./Temp/roundRob", recursive = TRUE)  # To delete it
+@
+\end{itemize}
+And we'll start again.
+\newslide
+\subsection{Adding documentation and a better \texttt{NAMESPACE}}
+
+Now re-construct the package using \rfile{./PackageMaterials/Example\_2/round\_rob\_rox.R}
+rather than the previous \R script.  This one has the \rcode{roxygen2} comments inserted.
+
+\begin{itemize}
+\item Go through the previous process to set up the package project, but do not as yet
+build the package.
+\item Look over the \rcode{roxygen2} comments in the \R script and see if you can
+understand what they are doing.
+\item Edit the \rfile{DESCRIPTION} file to complete all fields as
+indicated.  At least add a newline at the end of the file.
+\item Go to the \emph{More} button of the package \emph{Build} tab
+and select \emph{Configure package build tools}. Tick the last
+box to ensure \rcode{roxygen} is invoked to produce the \rfile{.Rd}
+files and modify the \rfile{NAMESPACE} file.
+\item Delete the temporary \rfile{NAMESPACE} file.  \rcode{file.remove("NAMESPACE")}.
+\item Click on \code{Build} $\longrightarrow$ \code{Install and Restart} and cross your fingers!
+\end{itemize}
+If things have worked as they should, you should now be in a new \R
+session with your newly created and installed package attached to
+the search path. Check to see that the functions work.
+<<eval=FALSE>>=
+(tourn <- tornament(AFLW))  ## gives a full torunament
+team_schedule(tourn)        ## unpicks the tournament for each team
+@
+
 \newslide
 
 \subsection{Source and binary package files}
@@ -404,30 +557,30 @@ NOTE: Windows binary packages are usually built for both \texttt{32-} and
 If you wish to do this you will need to change a few options, or build
 the package outside \RStudio.
 \newslide
-\section{Example 2: A package with \R code and data}
-\label{sec:Example 2: A package with pure R code and data}
-
-This is possibly even a useful example.  The \rfile{Example\_2} subdirectory
-contains two files:
-<<line_392_>>=
-dir("./PackageMaterials/Example_2/")
-@
-One is an \R code file, with \rcode{roxygen} comments already done,
-and the other, \rfile{NRL.rda} is a binary file with data, (of a kind).
-\begin{itemize}
-  \item The process is the same as before, but include both files when making the package.
-  \item When the skeleton package folder (i.e. \RStudio package project) is created,
-    it will have an extra subfolder, \rfile{data}, and the file \rfile{NRL.rda} placed
-    inside it.
-\newslide
-  \item Note carefully how the \rcode{roxygen} comments have been done, and how the
-    entry for the data component is included (at the top of the \R code file).
-  \item Fill out the \rfile{DESCRIPTION} file, making yourself the ``Maintainer'' and
-    including yourself and myself as ``Authors''.
-  \item Modify you package build tools, via the menu, so that the \rcode{roxygen} comments
-    are used both to construct the help files \emph{and} the \rfile{NAMESPACE} file on the
-    top level.  This is very important, and do not adjust the \rfile{NAMESPACE} file manually.
-\end{itemize}
+% \section{Example 2: A package with \R code and data}
+% \label{sec:Example 2: A package with pure R code and data}
+% 
+% This is possibly even a useful example.  The \rfile{Example\_2} subdirectory
+% contains two files:
+% <<line_392_>>=
+% dir("./PackageMaterials/Example_2/")
+% @
+% One is an \R code file, with \rcode{roxygen} comments already done,
+% and the other, \rfile{NRL.rda} is a binary file with data, (of a kind).
+% \begin{itemize}
+%   \item The process is the same as before, but include both files when making the package.
+%   \item When the skeleton package folder (i.e. \RStudio package project) is created,
+%     it will have an extra subfolder, \rfile{data}, and the file \rfile{NRL.rda} placed
+%     inside it.
+% \newslide
+%   \item Note carefully how the \rcode{roxygen} comments have been done, and how the
+%     entry for the data component is included (at the top of the \R code file).
+%   \item Fill out the \rfile{DESCRIPTION} file, making yourself the ``Maintainer'' and
+%     including yourself and myself as ``Authors''.
+%   \item Modify you package build tools, via the menu, so that the \rcode{roxygen} comments
+%     are used both to construct the help files \emph{and} the \rfile{NAMESPACE} file on the
+%     top level.  This is very important, and do not adjust the \rfile{NAMESPACE} file manually.
+% \end{itemize}
 \newslide
 \subsection{Adding a vignette}
 \label{sub:Adding a vignette}
@@ -439,102 +592,97 @@ Now things get interesting.
     this is done somewhat indirectly:
 <<line_420_,eval=FALSE>>=
 library(devtools)
-use_vignette("planning_a_tournament") ## which is NOT in devtools!
+use_vignette("planning_a_tournament") 
 @
-    Don't try to shortcut this using \verb|devtools::use_vignette(...)| as the function
-    is not in the \rcode{devtools} package.  It's complicated and rather strange.
+    
   \item After editing your tentative vignette, make sure your build tools also covers
     building vignettes.  Alternatively, or as well, build them directly using
 <<line_428_,eval=FALSE>>=
-build_vignettes()  ## which IS in the devtools package...
+build_vignettes()  
 @
   \item Complete the package build and install as usual, and try it out.
 \end{itemize}
 
 \newslide
 
-\section{Example 3: A package with \R and \Cpp code}
+\section{Example 2: A package with \R and \Cpp code}
 \label{sec:example-2:-package}
 
 This is definitely more tricky however you do it, but easy enough once
 you have done it a few times.
 
-The \rfile{PackageMaterials/Example\_3} subdirectory contains a file
-\rfile{convolveCpp.cpp} containing the \Cpp code for the convolution
-function, \emph{together with the \rcode{roxygen} comments in the
-required form}, which can be used together with \rfile{convolveR.R}
-to make an example package.
+The \rfile{PackageMaterials/example\_cpp} subdirectory contains a file
+\rfile{localWeighting.cpp} containing the \Cpp code for a simple local smoother
+and a kernel density estimate, and the \R script \rfile{local\_smooth.R} contains
+linking functions, together with the \rcode{roxygen2} comments
 
 <<line_448_>>=
-dir("./PackageMaterials/Example_3/")
+dir("./PackageMaterials/example_cpp/")
 @
 
-The second \Cpp file is the one used in a previous presentation.  It is
-not set up with \rcode{roxygen} comments.
 \newslide
 
 Rather than set out in detail all the steps as we did above, the
 process will be demonstrated during the session.  Here are a few
-preliminary general notes:
-\begin{itemize}
-\item To get anywhere you will need to have the package building tools
+preliminary general notes.
+
+\begin{footnotesize}
+   To get anywhere you will need to have the package building tools
   needed already installed on your machine.  For \Windows this means
   you will need to have the \rcode{Rtools} bundle installed and
   ideally \rcode{MiKTeX} as well.  This is the major issue.
-\item The process starts in much the same way as with the pure~\R
-  case.  The \Cpp and \R files are both include in the \emph{Add}
-  group, and the package build project is initiated in the same way.
+\end{footnotesize}
+\begin{itemize}
+\item Start the build process in much the same way as before, however
+\begin{itemize}
+\item Choose a \code{Package} with a new directory, rather than choosing
+the option \code{Package using Rcpp}.  
+\item At the next window begin with \code{Package type} and choose
+\code{Package w/Rcpp}.  
+\end{itemize}
+\item With the package project set up and the package waiting to be built
 \item Modify the \rfile{DESCRIPTION} file as before, but \emph{DO NOT
     REMOVE} the \rfile{NAMESPACE} file yet!
-\item Adjust the build tools to include using \rcode{roxygen} in the
-  same way as before.
+\item Adjust the build tools  to include using \rcode{roxygen} in the
+  same way as before, \emph{but do not include generating a \rfile{NAMESPACE}}
+  yet.
 \newslide
-\item In the console window type the command:
-<<pkg1,eval=FALSE>>=
-use_rcpp()  ## not in the devtools package, but made visible through it!
-@
-This will do a few cleanup tasks and issue, on the console window, a
-few more roxygen comments to be inserted on your \R script file
-(somewhere). Suppose the package is names \rfile{convolveCpp}.  These
-additional lines will usually be something like:
-<<pkg2,eval=FALSE>>=
-#' @useDynLib convolveCpp
-#' @importFrom Rcpp sourceCpp
+\item The file \rfile{R/local\_smooth.R} starts with a few \rcode{roxygen} comments
+<<eval=FALSE>>=
+#' @useDynLib miscSmooth
+#' @import Rcpp
+#' @import stats
 NULL
 @
-Include these lines, including the \rcode{NULL} line, on your \R
-script and save it.
-\item On the command line again type the command:
-<<pkg3,eval=FALSE>>=
-document()   ## probably in "devtools" but may be "usethis"!
+Make sure the name on the first line matches the name you have given for your
+package \emph{exactly}. This is really important -- as is everything else!
+\item In the console window type the command:
+<<pkg1,eval=FALSE>>=
+devtools::document()
 @
-and see that it looks (mostly) OK.
+This will do an initial building of the \Cpp code, but will not yet change the
+\rfile{NAMESPACE}.
+\item
 \newslide
-\item Now \emph{remove} the \rfile{NAMESPACE} file and repeat the same
-  command:
-<<pkg4,eval=FALSE>>=
-document()   ## a second time!
-@
-This should create a new \rfile{NAMESPACE} file from the
-\rcode{roxygen} comments and hence work correctly with the package.
-\item Click on \emph{Build \& reload}, cross your fingers and stand
+Now do three things
+\begin{itemize}
+  \item adjust the bulid tools so that a \rfile{NAMESPACE} file \emph{is} constructed,
+  (tick \emph{all} the boxes),
+  \item Remove the \rfile{NAMESPACE} file, 
+  \item Click on \code{Install and Restart}, cross your fingers and stand
   well back!
+\end{itemize}
+
 \end{itemize}
 
 The process becomes more straightforward with practice, of course.
 
-Also, the \rfile{devtools} package is still under active development
-so keep and eye out for improvements, extensions and changes---most of
-which are not likely to be backwards compatible.\footnote{At the time
-of writing, the command \rcode{library(devtools)} actually puts another
-package, \rcode{usethis} [sic!] ahead of it on the search path.  This is
-a sure sigh things are in flux.}
 
 
-\newslide
-
-\subsection{A minor exegesis}
-\label{sec:minor-exegesis}
+% \newslide
+% 
+% \subsection{A minor exegesis}
+% \label{sec:minor-exegesis}
 
 The reason for this slightly indirect way of going about thins is that
 the \rcode{roxygen} functions, by default, will not change a
@@ -548,7 +696,7 @@ This latter function does \rcode{complieAttributes()}, \emph{does}
 require at least a nominal \rfile{NAMESPACE} to be in place for it to
 work.
 
-The second call to \rcode{document()} does not need to call
+The second call to \rcode{document()} (indirectly, via \code{Install and Restart}) does not need to call
 \rcode{complieAttributes} again, though, so it can now write the new
 \rfile{NAMESPACE} file using information that has already been
 generated.

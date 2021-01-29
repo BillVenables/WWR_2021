@@ -436,19 +436,20 @@ These date from 2012.  They were obtained from the internet, but the units were 
 
 <<recent,fig.show="hold">>=
 Janka <- within(Janka2012, {
-  Type <- ifelse(grepl("Eucalyptus", Binomial), "Eucalpyt", "Other") %>%
-    factor()
+  Type <- ifelse(grepl("Eucalyptus", Binomial), "Eucalpyt", "Other") 
 })
 
-jp <- ggplot(Janka, aes(Density, Hardness)) + geom_point() +
-  aes(colour = Type) + coord_trans("log10", "log10") +
+jp <- ggplot(Janka) + aes(x = Density, y = Hardness) + geom_point() +
+  aes(colour = Type) + # coord_trans("log10", "log10") +
+  scale_x_log10() + scale_y_log10() +
   scale_colour_brewer(palette = "Set1", name = "Genus")
 jp
 jp  +  ## identify the light species
   ggrepel::geom_text_repel(data = filter(Janka, Density < 600),
                            aes(label = Name), size = 3,
                            colour = greenish,  ## some transparency
-                           fontface = "bold", family = "serif")
+                           fontface = "bold", family = "serif") +
+  geom_smooth(method = "lm", se = FALSE, formula = y ~ x, size = 0.5)
 @
 
 

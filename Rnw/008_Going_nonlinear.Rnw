@@ -143,8 +143,8 @@ Wouldn't it be great if we could put the initial value process into code as well
 This is something of a detailed topic, but important if you work in this area.
 <<>>=
 SSstormer <- selfStart(model = ~ b*v/(w - c), parameters = c("b", "c"),
-                       initial = function(mCall, data, LHS) { ## the tricky bit
-                         t <- eval(LHS, data)
+                       initial = function(mCall, data, LHS, ...) {## '...' needed
+                         t <- eval(LHS, data)                     ## in R 4.0.4
                          v <- eval(mCall[["v"]], data)
                          w <- eval(mCall[["w"]], data)
                          b <- coef(lm(I(w*t) ~ 0 + v + t))
@@ -175,7 +175,7 @@ initial value function and a self-starting model.
 <<>>=
 SSstormer2 <- selfStart(~ b*(v + f)/(w - c), 
                         parameters = c("b", "c", "f"),
-                        initial = function (mCall, data, LHS) {
+                        initial = function (mCall, data, LHS, ...) {
                           t <- eval(LHS, data)
                           v <- eval(mCall[["v"]], data)
                           w <- eval(mCall[["w"]], data)
@@ -313,7 +313,7 @@ Our self-starting model is as follows:
 <<>>=
 SSnegexp <- selfStart(model = ~ b0 + b1*exp(-t/theta),
                       parameters = c("b0", "b1", "theta"),
-                      initial = function(mCall, data, LHS) {
+                      initial = function(mCall, data, LHS, ...) {
                         t <- eval(mCall[["t"]], data)
                         y <- eval(LHS, data)
                         r <- range(t)
@@ -489,7 +489,7 @@ in the \rfile{stats} package which uses another parametrisation.)
 <<>>=
 SSgompertz2 <- selfStart(model = ~ exp(b0 - b1*rho^x), 
                          parameters = c("b0", "b1", "rho"),
-                         initial = function(mCall, data, LHS) {
+                         initial = function(mCall, data, LHS, ...) {
                            x <- eval(mCall[["x"]], data)
                            y <- eval(LHS, data)
                            r <- range(x)

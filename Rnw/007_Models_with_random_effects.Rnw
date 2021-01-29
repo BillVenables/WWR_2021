@@ -407,11 +407,9 @@ illustrate below.
 \newslide
 
 <<g3>>=
-re1 <- ranef(TModelGLMM)
-re2 <- ranef(TModelGAMM$lme)$Survey  ## obscure
-re12 <- cbind(re1, re2)
-names(re12) <- c("GLMM", "GAMM")
-re12
+re1 <- setNames(ranef(TModelGLMM), "GLMM")
+re2 <- setNames(ranef(TModelGAMM$lme)$Survey, "GAMM")  ## obscure
+(re12 <- cbind(re1, re2))
 @
 
 \newslide

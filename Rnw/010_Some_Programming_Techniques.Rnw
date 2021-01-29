@@ -587,7 +587,7 @@ benchmark(convolve0 (a,b), convolve1 (a,b), convolve1 (b,a),
           convolve1a(a,b), convolve1a(b,a), convolve2 (a,b),
           convolve2a(a,b), convolve3 (a,b), convolve3a(a,b),
           columns = c("test", "replications", "elapsed", "relative"),
-          order = "relative", relative = "elapsed")
+          order = "relative", relative = "elapsed", replications = 20)
 @
 
 \newslide
