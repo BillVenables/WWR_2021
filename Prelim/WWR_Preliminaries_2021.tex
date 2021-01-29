@@ -14,6 +14,9 @@
     filecolor=magenta,      
     urlcolor=blue,
 }
+% \newcommand{\git}{{\color{brown}\textbf{\textsf{git}}}\xspace}
+% \newcommand{\github}{{\color{brown}\textbf{\textsf{GitHub}}}\xspace}
+% \newcommand{\gitlab}{{\color{brown}\textbf{\textsf{GitLab}}}\xspace}
 
 \title{Working with \Rlogo:\\
   A University of Queensland Advanced Workshop\\[10pt]
@@ -22,8 +25,9 @@ Preliminaries for Participants}
 \author{Bill Venables, Data61, CSIRO\\
 Rhetta Chappell, Griffiths University}
 \date{2021-02-02 -- 2021-02-05\\[10pt]
-  Room 216, Sir Llew Edwards Building\\[5pt]
-  The University of Queensland}
+  Room 316, Building 69\\[5pt]
+  The University of Queensland\\[5pt]
+  9:00AM -- 4:00PM}
 
 
 \begin{document}
@@ -93,11 +97,11 @@ problems from your own professional disciplines.
     participants have a particular preference, but some aspects of the
     work will then not be easily available.  We strongly recommend
     participants have \RStudio installed, whether they use it
-    routinely or not.}  As of now, the latest version is
-  \RStudio~1.4.1103.  We recommend you update to this release, (or
+    routinely or not.}  The latest version is
+  \hbox{\RStudio}~1.4.1103 (as of now).  We recommend you update to this release, (or
   later).  A link to the download site is given
   \href{https://rstudio.com/products/rstudio/download/}{here}. The
-  free desktop version is adequate.
+  free desktop version is adequate.  
 
   To update an existing installation, a good way to begin is to start
   up \RStudio and go to the menu:
@@ -106,18 +110,6 @@ problems from your own professional disciplines.
   \end{center}
   and follow the advice.
   
-  The main materials for the course will be delivered as a complete
-  \RStudio~\emph{Project} as a \verb|.zip| file.  This can be
-  downloaded and expanded to provide a directory (or folder) that will
-  form the \emph{working directory} for the workshop.  This directory
-  will have several sub-directories with the file materials logically
-  classified.  When expanded, the folder name will be \verb|WWR_2021|.
-
-  Users may locate this folder anywhere on the file system of their
-  machines, or even on an attached memory
-  device.\footnote{Participants unfamiliar with, or preferring not to
-    use \RStudio, may use this project directory in the same way they
-    would any \R working directory.}
 \item[Other tools used with \R] To take part fully in the workshop,
   some ancillary programming tools will be needed.  These are mainly
   needed to deal with using fast compiled code in computations and
@@ -166,7 +158,34 @@ problems from your own professional disciplines.
   if users unfamiliar with the system wish to investigate.
   
 
+
 \end{description}
+
+\section{Course materials}
+    The main materials for the course will be
+  provided in the form of an
+  \RStudio \emph{Project} whick will be delivered as a \verb|.zip| file.
+  This may be either downloaded from 
+  \href{https://www.dropbox.com/s/gwu9hfxtvs1xshh/WWR_2021.zip?dl=0}{this Dropbox link}.
+  
+  \emph{The file is approximately 135Mb, so downloading may take some time.}  
+  
+   Once downloaded it may be expanded
+  into  a directory (or folder) that will
+  form the \emph{working directory} for the workshop.  This directory
+  will have several sub-directories with the file materials logically
+  classified.  When expanded, the folder name will be \verb|WWR_2021|.
+
+  Users may locate this folder anywhere on the file system of their
+  machines, or even on an attached memory
+  device.\footnote{Participants unfamiliar with, or preferring not to
+    use \RStudio, may use this project directory in the same way they
+    would any \R working directory.}
+
+Alternatively, participants using \git may \emph{clone} the folder directly
+from the \github repo, which is 
+
+\centerline{\url{https://github.com/BillVenables/WWR_2021}}
 
 \section{Synopsis}
 \label{sec:synopsis}
@@ -214,13 +233,6 @@ The recommended set-up process is:
     \href{mailto:Bill.Venables@gmail.com}{Bill.Venables@gmail.com}.
  
   \end{enumerate}
-
-        
-
-\section{Links}
-\label{sec:links}
-
-<section yet to come>
 
 Good luck, and welcome to the workshop!
 
