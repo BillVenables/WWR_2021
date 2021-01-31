@@ -21,7 +21,7 @@ NULL
 #' y <- x + rnorm(x, 0, 2)
 #' xo <- seq(min(x), max(x), len = 250)
 #' ys <- local_smooth(x, y, 0.55, xo)
-#' ysr <- local_smoothR(x, y, 0.55, xo
+#' ysr <- local_smoothR(x, y, 0.55, xo)
 #' all.equal(ys, ysr)
 #' 
 #' plot(x, y, pch = ".", cex = 2,
