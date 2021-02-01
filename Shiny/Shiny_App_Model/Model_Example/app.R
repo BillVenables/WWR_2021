@@ -4,7 +4,7 @@
 library(shiny)
 library(DT)
 library(tidyverse)
-#library(nnet) - for model only 
+library(nnet) #- for model only 
 
 
 # #code for model - multinomial logistic regression
