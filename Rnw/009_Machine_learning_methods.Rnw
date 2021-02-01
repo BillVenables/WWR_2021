@@ -77,7 +77,7 @@ sources, namely the file \rfile{creditCard.csv}.
 \newslide
 Read in the data and
 <<cc1>>=
-library(WWRCourse)
+suppressPackageStartupMessages(library(WWRCourse))
 CCf <- system.file("extdata", "creditCard.csv", package = "WWRCourse")
 CC <- read.csv(CCf, na.strings="", stringsAsFactors = TRUE)
 row.names(CC) <- fill0(CC$ident)
@@ -86,8 +86,8 @@ with(CC, c(cases = nrow(CC), known = sum(!is.na(credit.card.owner))))
 @
 
 The data is mostly \emph{unknown}: for building predictive models we
-only have \Sexpr{english(with(CC, sum(!is.na(credit.card.owner))))}
-\emph{at most} from \Sexpr{english(nrow(CC))} cases.
+only have \Sexpr{words(with(CC, sum(!is.na(credit.card.owner))))}
+\emph{at most} from \Sexpr{words(nrow(CC))} cases.
 
 \newslide
 <<cc2>>=
@@ -110,8 +110,8 @@ CC <- CC %>% within({
 CCKnown <- na.omit(CC)
 dim(CCKnown)
 @
-For model building we have just \Sexpr{english(nrow(CCKnown))} cases and
-\Sexpr{english(ncol(CCKnown)-1)} potential predictors.
+For model building we have just \Sexpr{words(nrow(CCKnown))} cases and
+\Sexpr{words(ncol(CCKnown)-1)} potential predictors.
 
 For demonstration purposes we split these into \emph{Training} and
 \texttt{Test} data sets.
@@ -122,7 +122,6 @@ train <- sample(nrow(CCKnown), nrow(CCKnown)/2)
 
 CCTrain <- CCKnown[train, ]
 CCTest <- CCKnown[-train, ]
-Store(CC, CCKnown, CCTrain, CCTest, train, remove = FALSE)  ## for saftey
 @
 \newslide
 % \subsection{Making compressed text versions}
@@ -196,7 +195,6 @@ number of techniques, mostly of the ``black box'' kind.
 <<t3,fig.height=6 * 1.5,fig.width=8 * 1.5,fig.show="hold">>=
 requireData(rpart)
 CCTree <- rpart(credit.card.owner ~ ., CCTrain)
-Store(CCTree, remove = FALSE)
 
 ## The first graphic shows the initial fitted tree:
 
@@ -214,7 +212,6 @@ Pruning is suggested by the ``one standard error'' rule.  Get the pruned tree:
 <<t5,fig.height=6 * 1.5,fig.width=8 * 1.5>>=
 oneSERule(CCTree)               ## optimal tuning paramater
 CCPTree <- prune(CCTree, cp = oneSERule(CCTree))
-Store(CCPTree, remove = FALSE)
 
 plot(CCPTree)             ## should have 10 terminal nodes
 text(CCPTree, xpd = NA)
@@ -222,12 +219,13 @@ text(CCPTree, xpd = NA)
 
 \newslide
 The ``one standard error rule'' function(s) are listed here for
-completeness.  (The coding details are not important for our primary
-purpose here.)
+completeness.  
+% (The coding details are not important for our primary
+% purpose here.)
 <<oneSE>>=
-WWRCourse::oneSERule
-methods("oneSERule")
-WWRCourse:::oneSERule.rpart
+WWRCourse::oneSERule         ## Generic function
+methods("oneSERule")         %>% format() %>% noquote() ## some suppression
+WWRCourse:::oneSERule.rpart  ## Registered method
 @
 \newslide
 
@@ -281,7 +279,8 @@ predict.bagRpart <- function(object, newdata, ...) {
   X <- t(apply(X, 1, function(r) table(factor(r, levels = candidates))))
   factor(candidates[max.col(X)], levels = candidates)
 }
-Store(bagRpart, lib = .Robjects)
+.S3method("predict", "bagRpart")  ## >= R 4.0.0
+Store(bagRpart, predict.bagRpart, lib = .Robjects)
 @
 
 An alternative coding using \rcode{replicate}:
@@ -318,7 +317,6 @@ Obj <- update(CCTree, cp = 0.005, minsplit = 9)  ## expand the tree
 (one <- rbind(standard = system.time(CCSBag <- bagRpart(Obj, nBags = 200)),
               Bayes = system.time(CCBBag <- bagRpart(Obj, nBags = 200,
                                                      type = "bayes"))))
-Store(CCSBag, CCBBag, remove = FALSE)
 @
 <<include=FALSE>>=
   if("package:MASS" %in% search()) detach("package:MASS")
@@ -385,7 +383,6 @@ rbind(one,
       BayesP = system.time(CCBBagP    <- bagRpartParallel(Obj, nBags = 200, 
                                                           type = "bayes")))
 rm(Obj, one)
-Store(CCSBagP, CCBBagP, remove = FALSE)
 @ 
 <<include=FALSE>>=
   if("package:MASS" %in% search()) detach("package:MASS")
@@ -412,8 +409,8 @@ X <- replicate(200,
 (lims <- range(rowSums(X > 0)))
 rm(n, X)
 @
-So in this simulation the cases were sampled between \Sexpr{english(lims[1])}
-and \Sexpr{english(lims[2])} times.  This seems about enough.
+So in this simulation the cases were sampled between \Sexpr{words(lims[1])}
+and \Sexpr{words(lims[2])} times.  This seems about enough.
 
 \newslide
 We now fit the random forest.
@@ -421,7 +418,6 @@ We now fit the random forest.
 <<trf2>>=
 requireData(randomForest)
 (CCRf <- randomForest(credit.card.owner ~ ., CCTrain, ntree = 200))
-Store(CCRf, remove = FALSE)
 @
 % \newslide
 
@@ -436,7 +432,9 @@ OOB.randomForest <- function(obj, ...)
       if(type == "classification" && exists("confusion", frame = here))
           err.rate[ntree, "OOB"] else NA
     })
-# Store(OOB, OOB.default, OOB.randomForest, lib = .Robjects)
+.S3method("OOB", "default")
+.S3method("OOB", "randomForest")
+Store(OOB, OOB.default, OOB.randomForest, lib = .Robjects)
 @
 The ``out of bag'' (OOB) error rate is estimated as
 \Sexpr{round(OOB(CCRf), 4)*100}\%.  We check later how this compares
@@ -526,8 +524,6 @@ consider other modest versions, but automatically produced.
 
 Call <- substitute(glm(FORM, binomial, CCTrain), list(FORM = form))
 CCGlmNaive <- eval(Call)
-Store(CCGlmNaive, remove = FALSE)
-
 @
 <<g1,cache=TRUE>>=
 
@@ -539,7 +535,6 @@ scope <- list(upper=upp, lower=~1)
 CCGlmAIC <- step_AIC(CCGlmNaive, scope = scope)
 CCGlmGIC <- step_GIC(CCGlmNaive, scope = scope)
 CCGlmBIC <- step_BIC(CCGlmNaive, scope = scope)
-Store(CCGlmAIC, CCGlmBIC, form, upp, remove = FALSE)
 @
 <<include=FALSE>>=
   if("package:MASS" %in% search()) detach("package:MASS")
@@ -569,7 +564,6 @@ CCglmboost <- eval(Call)
   ## more packages needed!
 CCblackboost <- blackboost(credit.card.owner ~ ., CCTrain, 
                            family = Binomial())
-Store(CCglmboost, CCblackboost, remove = FALSE)
 @
 
 
@@ -584,7 +578,6 @@ be considered intermediate between trees and forests.
 <<quin>>=
 requireData(C50)  ## NB C-5-Zero
 (CCc50 <- C5.0(credit.card.owner ~ ., CCTrain))
-Store(CCc50)
 @
 \newslide
 The \rfile{C50} package, like \rfile{randomForest}, has some tools that allow the
@@ -619,7 +612,7 @@ response confined to the values $\{0, 1\}$, which can be a bit awkward:
 
 <<>>=
 suppressPackageStartupMessages(library(gbm))
-(CCgbm <- gbm(ifelse(credit.card.owner == "no", 0, 1) ~ ., data = CCKnown, 
+(CCgbm <- gbm(ifelse(credit.card.owner == "no", 0, 1) ~ ., data = CCTrain, 
               distribution = "bernoulli", n.trees = 200, cv.folds = 10))
 @
 \newslide
@@ -639,12 +632,12 @@ Partial dependency plots are also available.
 Look at the four ``most influential'' variables
 
 <<>>=
-suppressPackageStartupMessages({
-  library(gridExtra)
-})
+suppressPackageStartupMessages(library(gridExtra))
+
 (vars <- tmp$var[1:4])                   ## four "most influential" variables
 plots <- lapply(vars, . %>% plot(CCgbm, i.var = ., type = "response"))
 grobs <- arrangeGrob(grobs = plots, layout_matrix = rbind(1:2, 3:4))
+
 plot(grobs)
 @
 
@@ -665,19 +658,20 @@ Class.rpart <- function(object, newdata, ...)
 
 Class.bagRpart <- function(object, newdata, ...)
     predict(object, newdata)
-
 Class.randomForest <- Class.C5.0 <- predict
 
 Class.glm <- Class.mboost <- Class.gbm <- function(object, newdata, ...) {
   ## only applies for binomial GLMs with symmetric links
   suppressMessages(predict(object, newdata) > 0)
 }
+for(k in sub("Class\\.", "", ls(pattern = "^Class\\."))) .S3method("Class", k)
+Store(list = ls(pattern = "^Class"), lib = .Robjects)
 @
 \newslide
 The helper function \rcode{Class} streamlines things a bit:
-<<line_583_,echo=FALSE>>=
-SOAR::Attach()
-@
+% <<line_583_,echo=FALSE>>=
+% SOAR::Attach()
+% @
 
 <<errors>>=
 errorRate <- function(tab) 100*(1 - sum(diag(tab))/sum(tab))

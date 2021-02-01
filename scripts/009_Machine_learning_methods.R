@@ -1,6 +1,6 @@
-## ----"prelim",child="00-Prelim.Rnw"--------------------------------------------------------------------------------------
+## ----"prelim",child="00-Prelim.Rnw"------------------------------------------------------------------------------
 
-## ----prelim,include=FALSE,tidy=FALSE-------------------------------------------------------------------------------------
+## ----prelim,include=FALSE,tidy=FALSE-----------------------------------------------------------------------------
 
 
 
@@ -119,18 +119,18 @@ setHook("plot.new",
 
 
 
-## ----setFigPath,include=FALSE--------------------------------------------------------------------------------------------
+## ----setFigPath,include=FALSE------------------------------------------------------------------------------------
 .infile <- sub("\\.Rnw$", "", knitr::current_input())
 knitr::opts_chunk$set(fig.path = paste0('Fig/', .infile, "_")) #$
 session <- sub("^0+", "", sub("[^[:digit:][:alpha:]].*$", "", .infile))
 
 
-## ----eng,echo=FALSE------------------------------------------------------------------------------------------------------
+## ----eng,echo=FALSE----------------------------------------------------------------------------------------------
 library(english)
 
 
-## ----cc1-----------------------------------------------------------------------------------------------------------------
-library(WWRCourse)
+## ----cc1---------------------------------------------------------------------------------------------------------
+suppressPackageStartupMessages(library(WWRCourse))
 CCf <- system.file("extdata", "creditCard.csv", package = "WWRCourse")
 CC <- read.csv(CCf, na.strings="", stringsAsFactors = TRUE)
 row.names(CC) <- fill0(CC$ident)
@@ -138,7 +138,7 @@ row.names(CC) <- fill0(CC$ident)
 with(CC, c(cases = nrow(CC), known = sum(!is.na(credit.card.owner))))
 
 
-## ----cc2-----------------------------------------------------------------------------------------------------------------
+## ----cc2---------------------------------------------------------------------------------------------------------
 CC <- CC %>% within({
   p2 <- c("doctor", "engineer", "lawyer", "professor", "business")
   p1 <- c("teacher", "police", "service", "chemist", "nurse",
@@ -159,19 +159,17 @@ CCKnown <- na.omit(CC)
 dim(CCKnown)
 
 
-## ----cc3-----------------------------------------------------------------------------------------------------------------
+## ----cc3---------------------------------------------------------------------------------------------------------
 set.seed(20200202)    ## for reproducibility
 train <- sample(nrow(CCKnown), nrow(CCKnown)/2)
 
 CCTrain <- CCKnown[train, ]
 CCTest <- CCKnown[-train, ]
-Store(CC, CCKnown, CCTrain, CCTest, train, remove = FALSE)  ## for saftey
 
 
-## ----t3,fig.height=6 * 1.5,fig.width=8 * 1.5,fig.show="hold"-------------------------------------------------------------
+## ----t3,fig.height=6 * 1.5,fig.width=8 * 1.5,fig.show="hold"-----------------------------------------------------
 requireData(rpart)
 CCTree <- rpart(credit.card.owner ~ ., CCTrain)
-Store(CCTree, remove = FALSE)
 
 ## The first graphic shows the initial fitted tree:
 
@@ -183,22 +181,21 @@ text(CCTree, xpd = NA)
 plotcp(CCTree)
 
 
-## ----t5,fig.height=6 * 1.5,fig.width=8 * 1.5-----------------------------------------------------------------------------
+## ----t5,fig.height=6 * 1.5,fig.width=8 * 1.5---------------------------------------------------------------------
 oneSERule(CCTree)               ## optimal tuning paramater
 CCPTree <- prune(CCTree, cp = oneSERule(CCTree))
-Store(CCPTree, remove = FALSE)
 
 plot(CCPTree)             ## should have 10 terminal nodes
 text(CCPTree, xpd = NA)
 
 
-## ----oneSE---------------------------------------------------------------------------------------------------------------
-WWRCourse::oneSERule
-methods("oneSERule")
-WWRCourse:::oneSERule.rpart
+## ----oneSE-------------------------------------------------------------------------------------------------------
+WWRCourse::oneSERule         ## Generic function
+methods("oneSERule")         %>% format() %>% noquote() ## some suppression
+WWRCourse:::oneSERule.rpart  ## Registered method
 
 
-## ----tbag----------------------------------------------------------------------------------------------------------------
+## ----tbag--------------------------------------------------------------------------------------------------------
 bagRpart <- local({
   bsample <- function(dataFrame) # bootstrap sampling
     dataFrame[sample(nrow(dataFrame), rep = TRUE),  ]
@@ -226,10 +223,11 @@ predict.bagRpart <- function(object, newdata, ...) {
   X <- t(apply(X, 1, function(r) table(factor(r, levels = candidates))))
   factor(candidates[max.col(X)], levels = candidates)
 }
-Store(bagRpart, lib = .Robjects)
+.S3method("predict", "bagRpart")  ## >= R 4.0.0
+Store(bagRpart, predict.bagRpart, lib = .Robjects)
 
 
-## ----tbagsAlt,eval=FALSE-------------------------------------------------------------------------------------------------
+## ----tbagsAlt,eval=FALSE-----------------------------------------------------------------------------------------
 ## bagRpart <- local({
 ## ###
 ##   bsample <- function(dataFrame) # bootstrap sampling
@@ -252,19 +250,18 @@ Store(bagRpart, lib = .Robjects)
 ## })
 
 
-## ----tbag2,cache=TRUE----------------------------------------------------------------------------------------------------
+## ----tbag2,cache=TRUE--------------------------------------------------------------------------------------------
 set.seed(4321) ## 
 Obj <- update(CCTree, cp = 0.005, minsplit = 9)  ## expand the tree
 (one <- rbind(standard = system.time(CCSBag <- bagRpart(Obj, nBags = 200)),
               Bayes = system.time(CCBBag <- bagRpart(Obj, nBags = 200,
                                                      type = "bayes"))))
-Store(CCSBag, CCBBag, remove = FALSE)
 
-## ----include=FALSE-------------------------------------------------------------------------------------------------------
+## ----include=FALSE-----------------------------------------------------------------------------------------------
   if("package:MASS" %in% search()) detach("package:MASS")
 
 
-## ----para1---------------------------------------------------------------------------------------------------------------
+## ----para1-------------------------------------------------------------------------------------------------------
 ## parallel backend; includes other pkgs
 suppressPackageStartupMessages({
   library(doParallel)
@@ -276,7 +273,7 @@ cl <- makeCluster(nc-1)
 registerDoParallel(cl)
 
 
-## ----para2---------------------------------------------------------------------------------------------------------------
+## ----para2-------------------------------------------------------------------------------------------------------
 bagRpartParallel <- local({
   bsample <- function(dataFrame) # bootstrap sampling
     dataFrame[sample(nrow(dataFrame), rep = TRUE),  ]
@@ -306,25 +303,24 @@ bagRpartParallel <- local({
 })
 
 
-## ----para3,cache=TRUE----------------------------------------------------------------------------------------------------
+## ----para3,cache=TRUE--------------------------------------------------------------------------------------------
 Obj <- update(CCTree, cp = 0.005, minsplit = 9)  ## expand the tree
 rbind(one,
       standardP = system.time(CCSBagP <- bagRpartParallel(Obj, nBags = 200)),
       BayesP = system.time(CCBBagP    <- bagRpartParallel(Obj, nBags = 200, 
                                                           type = "bayes")))
 rm(Obj, one)
-Store(CCSBagP, CCBBagP, remove = FALSE)
 
-## ----include=FALSE-------------------------------------------------------------------------------------------------------
+## ----include=FALSE-----------------------------------------------------------------------------------------------
   if("package:MASS" %in% search()) detach("package:MASS")
 
 
-## ----line_377_, include=FALSE--------------------------------------------------------------------------------------------
+## ----line_377_, include=FALSE------------------------------------------------------------------------------------
 stopCluster(cl)  ## release resources
 rm(cl)
 
 
-## ----trf1----------------------------------------------------------------------------------------------------------------
+## ----trf1--------------------------------------------------------------------------------------------------------
 n <- nrow(CCTrain)
 X <- replicate(200,
        table(factor(sample(n, rep=TRUE), levels = 1:n)))
@@ -332,13 +328,12 @@ X <- replicate(200,
 rm(n, X)
 
 
-## ----trf2----------------------------------------------------------------------------------------------------------------
+## ----trf2--------------------------------------------------------------------------------------------------------
 requireData(randomForest)
 (CCRf <- randomForest(credit.card.owner ~ ., CCTrain, ntree = 200))
-Store(CCRf, remove = FALSE)
 
 
-## ----oob,include=FALSE---------------------------------------------------------------------------------------------------
+## ----oob,include=FALSE-------------------------------------------------------------------------------------------
 OOB <- function(obj, ...) UseMethod("OOB")
 OOB.default <- function(obj, ...)
     stop(sprintf("No OOB method for objects of class %s currently exists.",
@@ -349,10 +344,12 @@ OOB.randomForest <- function(obj, ...)
       if(type == "classification" && exists("confusion", frame = here))
           err.rate[ntree, "OOB"] else NA
     })
-# Store(OOB, OOB.default, OOB.randomForest, lib = .Robjects)
+.S3method("OOB", "default")
+.S3method("OOB", "randomForest")
+Store(OOB, OOB.default, OOB.randomForest, lib = .Robjects)
 
 
-## ----err-----------------------------------------------------------------------------------------------------------------
+## ----err---------------------------------------------------------------------------------------------------------
 err <- as.data.frame(CCRf$err.rate) %>% 
   rownames_to_column("trees") %>% 
   mutate(trees = as.numeric(trees)) %>% 
@@ -366,7 +363,7 @@ ggplot(err) + aes(x = trees, y = Error, colour = Which) + geom_line() +
                      plot.title = element_text(hjust = 0.5, face = "bold"))
 
 
-## ----rfplot, eval=FALSE--------------------------------------------------------------------------------------------------
+## ----rfplot, eval=FALSE------------------------------------------------------------------------------------------
 ## ER <- CCRf$err.rate
 ## plot(CCRf, ylim = range(0, ER)*1.05, lty = "solid", las = 1,
 ##      panel.first = grid(lty = "dashed"), main = "Credit Card - Training Data")
@@ -375,7 +372,7 @@ ggplot(err) + aes(x = trees, y = Error, colour = Which) + geom_line() +
 ##        title = "Which one:")
 
 
-## ----echo=FALSE----------------------------------------------------------------------------------------------------------
+## ----echo=FALSE--------------------------------------------------------------------------------------------------
 pal <- palette()
 pal[3] <- "dark green"
 palette(pal)
@@ -387,27 +384,25 @@ legend("bottomleft", colnames(ER), ncol = ncol(ER), bg = "white",
        title = "Which one:")
 
 
-## ----trf3----------------------------------------------------------------------------------------------------------------
+## ----trf3--------------------------------------------------------------------------------------------------------
 par(family="sans")
 varImpPlot(CCRf, pch = 20, col = "navy")  ## causes a plot
 (v <- sort(drop(importance(CCRf)), decreasing = TRUE))[1:6]
 best_few <- names(v)[1:20] %>% print ## used later
 
 
-## ----trfpp---------------------------------------------------------------------------------------------------------------
+## ----trfpp-------------------------------------------------------------------------------------------------------
 partialPlot(CCRf, pred.data = CCTrain, x.var = best_few[1], xlab = best_few[1])
 
 
-## ----glm0----------------------------------------------------------------------------------------------------------------
+## ----glm0--------------------------------------------------------------------------------------------------------
 (form <- as.formula(paste("credit.card.owner~",
                          paste(best_few, collapse="+"))))
 
 Call <- substitute(glm(FORM, binomial, CCTrain), list(FORM = form))
 CCGlmNaive <- eval(Call)
-Store(CCGlmNaive, remove = FALSE)
 
-
-## ----g1,cache=TRUE-------------------------------------------------------------------------------------------------------
+## ----g1,cache=TRUE-----------------------------------------------------------------------------------------------
 
 upp <- paste("~", paste(setdiff(names(CCTrain),
                                 "credit.card.owner"),
@@ -417,17 +412,16 @@ scope <- list(upper=upp, lower=~1)
 CCGlmAIC <- step_AIC(CCGlmNaive, scope = scope)
 CCGlmGIC <- step_GIC(CCGlmNaive, scope = scope)
 CCGlmBIC <- step_BIC(CCGlmNaive, scope = scope)
-Store(CCGlmAIC, CCGlmBIC, form, upp, remove = FALSE)
 
-## ----include=FALSE-------------------------------------------------------------------------------------------------------
+## ----include=FALSE-----------------------------------------------------------------------------------------------
   if("package:MASS" %in% search()) detach("package:MASS")
 
 
-## ----line_511_,include=FALSE---------------------------------------------------------------------------------------------
+## ----line_511_,include=FALSE-------------------------------------------------------------------------------------
 form <- as.formula(paste("credit.card.owner~",
                          paste(best_few, collapse="+")))
 
-## ----boost,cache=TRUE----------------------------------------------------------------------------------------------------
+## ----boost,cache=TRUE--------------------------------------------------------------------------------------------
 requireData(mboost)
 Call <- substitute(glmboost(FORM, data = CCTrain, family=Binomial()),
                    list(FORM = form))  ## same as naive model
@@ -436,16 +430,14 @@ CCglmboost <- eval(Call)
   ## more packages needed!
 CCblackboost <- blackboost(credit.card.owner ~ ., CCTrain, 
                            family = Binomial())
-Store(CCglmboost, CCblackboost, remove = FALSE)
 
 
-## ----quin----------------------------------------------------------------------------------------------------------------
+## ----quin--------------------------------------------------------------------------------------------------------
 requireData(C50)  ## NB C-5-Zero
 (CCc50 <- C5.0(credit.card.owner ~ ., CCTrain))
-Store(CCc50)
 
 
-## ----quin2,fig.show="hold"-----------------------------------------------------------------------------------------------
+## ----quin2,fig.show="hold"---------------------------------------------------------------------------------------
 obj <- C5imp(CCc50)
 data.frame(importance = obj$Overall, variable = rownames(obj)) %>% 
   filter(importance > 0) %>% 
@@ -454,32 +446,32 @@ data.frame(importance = obj$Overall, variable = rownames(obj)) %>%
 rm(obj)
 
 
-## ------------------------------------------------------------------------------------------------------------------------
+## ----------------------------------------------------------------------------------------------------------------
 suppressPackageStartupMessages(library(gbm))
-(CCgbm <- gbm(ifelse(credit.card.owner == "no", 0, 1) ~ ., data = CCKnown, 
+(CCgbm <- gbm(ifelse(credit.card.owner == "no", 0, 1) ~ ., data = CCTrain, 
               distribution = "bernoulli", n.trees = 200, cv.folds = 10))
 
 
-## ----out.lines = 15------------------------------------------------------------------------------------------------------
+## ----out.lines = 15----------------------------------------------------------------------------------------------
 summary(CCgbm, plotit = FALSE) %>% filter(rel.inf > 0)
 
 
-## ----out.height="75%"----------------------------------------------------------------------------------------------------
+## ----out.height="75%"--------------------------------------------------------------------------------------------
 par(mar = c(4,12,1,1), cex = 0.7)
 tmp <- summary(CCgbm)  ## tmp is now the data frame displayed above.
 
 
-## ------------------------------------------------------------------------------------------------------------------------
-suppressPackageStartupMessages({
-  library(gridExtra)
-})
+## ----------------------------------------------------------------------------------------------------------------
+suppressPackageStartupMessages(library(gridExtra))
+
 (vars <- tmp$var[1:4])                   ## four "most influential" variables
 plots <- lapply(vars, . %>% plot(CCgbm, i.var = ., type = "response"))
 grobs <- arrangeGrob(grobs = plots, layout_matrix = rbind(1:2, 3:4))
+
 plot(grobs)
 
 
-## ----Class---------------------------------------------------------------------------------------------------------------
+## ----Class-------------------------------------------------------------------------------------------------------
 Class <- function(object, newdata, ...)
     UseMethod("Class")
 
@@ -488,20 +480,17 @@ Class.rpart <- function(object, newdata, ...)
 
 Class.bagRpart <- function(object, newdata, ...)
     predict(object, newdata)
-
 Class.randomForest <- Class.C5.0 <- predict
 
 Class.glm <- Class.mboost <- Class.gbm <- function(object, newdata, ...) {
   ## only applies for binomial GLMs with symmetric links
   suppressMessages(predict(object, newdata) > 0)
 }
+for(k in sub("Class\\.", "", ls(pattern = "^Class\\."))) .S3method("Class", k)
+Store(list = ls(pattern = "^Class"), lib = .Robjects)
 
 
-## ----line_583_,echo=FALSE------------------------------------------------------------------------------------------------
-SOAR::Attach()
-
-
-## ----errors--------------------------------------------------------------------------------------------------------------
+## ----errors------------------------------------------------------------------------------------------------------
 errorRate <- function(tab) 100*(1 - sum(diag(tab))/sum(tab))
 true <- CCTest$credit.card.owner  #$
 (res <- sort(sapply(list(Tree = CCTree,            PrunedTree = CCPTree,
@@ -515,13 +504,13 @@ true <- CCTest$credit.card.owner  #$
                     function(x) errorRate(table(Class(x, CCTest), true)))))
 
 
-## ----err2,out.height="80%"-----------------------------------------------------------------------------------------------
+## ----err2,out.height="80%"---------------------------------------------------------------------------------------
 par(mar = c(3,8,3,1))
 barplot(rev(res), horiz=TRUE, las=1, fill = pal_green2brown)
 axis(3)
 
 
-## ----sessionInfo,echo=FALSE,results="asis",out.lines=200-----------------------------------------------------------------
+## ----sessionInfo,echo=FALSE,results="asis",out.lines=200---------------------------------------------------------
 cat("{\\bf\nDate: ", format(today()), "\n}")
 toLatex(sessionInfo(), locale = FALSE)
 
