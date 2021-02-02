@@ -7,7 +7,7 @@ library(tidyverse)
 # model only this wasn't in Bill's original packages script Sorry you may need to install
 library(nnet) 
 
-#predict the class or variety of iris based on 5 variables:
+#predict the variety of iris based on 5 variables:
         # Species
         # Sepal.Length
         # Sepal.Width
@@ -70,6 +70,9 @@ server <- function(input, output) {
     df <- read.csv(input$file_upload1$datapath, stringsAsFactors = TRUE)
     
     # run the model and add a column to hold/display the predictions
+    #newdata specifying the first place to look for explanatory variables to be used for prediction
+    #type  of predicted value returned = class
+         #class gives you the label assigned to that value 
     df$predictions <- predict(irisModel, newdata = iris, type ="class")
     #return the updated df with the new prediction column
     return(df)
