@@ -4,13 +4,22 @@
 library(shiny)
 library(DT)
 library(tidyverse)
-library(nnet) #- for model only 
+# model only this wasn't in Bill's original packages script Sorry you may need to install
+library(nnet) 
 
+#predict the class or variety of iris based on 5 variables:
+        # Species
+        # Sepal.Length
+        # Sepal.Width
+        # Petal.Length
+        # Petal.Width
 
-# #code for model - multinomial logistic regression
-# irisModel<-multinom(Species~Sepal.Length+Sepal.Width+Petal.Length+Petal.Width,data = iris)
+# #code for multinomial logistic regression model
+# irisModel <- multinom(Species ~ Sepal.Length + Sepal.Width + Petal.Length + Petal.Width, data = iris)
 
-#Logistic regression model is built and now save it as “irisModel.rds”.
+#Logistic regression model is built and now save it as an .rds file
+#??saveRDS
+# RDS = Functions to write a single R object to a file, and to restore it
 #saveRDS(irisModel, "irisModel.rds")
 
 #read in the model
@@ -25,9 +34,10 @@ ui <- fluidPage(
   # Sidebar with a slider input for number of bins 
   sidebarLayout(
     sidebarPanel(
-      # Input: Select a file ----
-      fileInput( inputId = "file1", 
-                 label = "upload csv file here",
+      # Input: Select a file and upload it ----
+      #??fileInput
+      fileInput( inputId = "file_upload1", 
+                 label = "upload  your csv file here",
                  multiple = FALSE,
                  #acceptable input file types
                  accept = c("text/csv",
@@ -42,7 +52,7 @@ ui <- fluidPage(
     
     # Show the table with the predictions
     mainPanel(
-      DT::dataTableOutput("mytable")
+      DT::dataTableOutput("pred_table")
     )# end mainPanel
   )# end sidebar Layout
 ) #end fluidPage (UI)
@@ -51,24 +61,27 @@ ui <- fluidPage(
 server <- function(input, output) {
   
   
-  reactiveDF<-reactive({
+  reactive_df<-reactive({
     #YOU have to upload a file for the thing to work
-    req(input$file1)
-    #read in the uploaded data
-    df <- read.csv(input$file1$datapath, stringsAsFactors = TRUE)
-    # run the model and add a column to hold the predictions
-    df$predictions<-predict(irisModel, newdata = iris, type ="class")
+    req(input$file_upload1)
+    # read in the uploaded data
+    # $datapath = The path to a temp file that contains the data that was uploaded. 
+    # This file may be deleted if the user performs another upload operation.
+    df <- read.csv(input$file_upload1$datapath, stringsAsFactors = TRUE)
+    
+    # run the model and add a column to hold/display the predictions
+    df$predictions <- predict(irisModel, newdata = iris, type ="class")
     #return the updated df with the new prediction column
     return(df)
     
-  })# end reactiveDF
+  })# end reactive_df
   
   #display the predictions in a table on the app
-  output$mytable = DT::renderDataTable({
-    req(input$file1)
+  output$pred_table = DT::renderDataTable({
+    req(input$file_upload1)
     
-    return(DT::datatable(reactiveDF(),  options = list(pageLength = 100), filter = c("top")))
-  }) # end mytable output
+    return(DT::datatable(reactive_df(),  options = list(pageLength = 100), filter = c("top")))
+  }) # end pred_table output
   
   
   # Downloadable csv of selected dataset ----
